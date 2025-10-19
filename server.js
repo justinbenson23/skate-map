@@ -151,7 +151,6 @@ app.post('/auth/logout', (req, res, next) => {
 
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const User = require('./models/User');
 const Pin = require('./models/Pin');
 const ensureAuthenticated = (req, res, next) => {
   if (req.isAuthenticated && req.isAuthenticated()) return next();
