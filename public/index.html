@@ -122,8 +122,6 @@
     const maxZoom = 5;
     const tileSize = 256;
 
-    let isLoggedIn = false;
-    let currentUser = null;
 
     const map = L.map('map', {
       crs: L.CRS.Simple,
@@ -135,16 +133,33 @@
       maxBoundsViscosity: 1.0
     });
 
-    L.tileLayer('/tiles/{z}/{x}_{y}.jpg', {
+    L.tileLayer('', {
       tileSize: tileSize,
       minZoom: 0,
       maxZoom: maxZoom,
       noWrap: true,
-      bounds: [[0, 0], [mapHeight, mapWidth]]
+      bounds: [[0, 0], [mapHeight, mapWidth]],
+
+      getTileUrl: function(coords) {
+        const z = coords.z;
+        const x = coords.x;
+        const y = coords.y;
+
+        const scale = Math.pow(2, z);
+        const maxX = Math.ceil(mapWidth / (tileSize * scale));
+        const maxY = Math.ceil(mapHeight / (tileSize * scale));
+
+        if (x < 0 || y < 0 || x >= maxX || y >= maxY) {
+          return ''; // skip out-of-bounds
+        }
+
+        return `/tiles/${z}/${x}_${y}.jpg`;
+      }
+
     })
     .on('tileerror', function(e) {
-      console.warn('Missing tile:', e.tile.src);
-  })
+      console.warn('🧱 Missing tile:', e.tile.src);
+    })
     .addTo(map);
 
     const pinForm = document.getElementById('pin-form');
