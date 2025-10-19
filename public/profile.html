@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>User Profile</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    .hidden { display: none; }
+    .pin-item { border: 1px solid #ccc; padding: 8px; margin-bottom: 6px; }
+    .pin-item button { margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Your Profile</h1>
+  <div id="profile-info">
+    <p>Username: <span id="username"></span></p>
+  </div>
+
+  <h2>Change Password</h2>
+  <div id="password-change">
+    <input type="password" id="current-password" placeholder="Current password"><br>
+    <input type="password" id="new-password" placeholder="New password"><br>
+    <button id="change-pass-btn">Change Password</button>
+    <div id="change-pass-msg"></div>
+  </div>
+
+  <h2>Your Pins</h2>
+  <div id="pins-container">
+    <div id="no-pins-msg">You have no posted pins.</div>
+    <div id="pins-list"></div>
+  </div>
+
+  <script>
+    async function fetchProfile() {
+      const resp = await fetch('/api/user/profile');
+      if (!resp.ok) {
+        window.location.href = '/'; // if not logged in, back to map
+        return;
+      }
+      const user = await resp.json();
+      document.getElementById('username').textContent = user.username;
+    }
+
+    async function fetchUserPins() {
+      const resp = await fetch('/api/user/pins');
+      const pins = await resp.json();
+      const container = document.getElementById('pins-list');
+      container.innerHTML = '';
+      if (pins.length === 0) {
+        document.getElementById('no-pins-msg').style.display = 'block';
+      } else {
+        document.getElementById('no-pins-msg').style.display = 'none';
+      }
+      pins.forEach(pin => {
+        const div = document.createElement('div');
+        div.className = 'pin-item';
+        div.innerHTML = `
+          <strong>${pin.title}</strong><br>
+          ${pin.description}<br>
+          <button data-id="${pin._id}">Delete</button>
+        `;
+        container.appendChild(div);
+      });
+
+      // Attach delete handlers
+      document.querySelectorAll('.pin-item button').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          const pinId = e.target.getAttribute('data-id');
+          const del = await fetch('/api/pin/' + pinId, {
+            method: 'DELETE'
+          });
+          if (del.ok) {
+            fetchUserPins();
+          } else {
+            alert('Delete failed');
+          }
+        });
+      });
+    }
+
+    document.getElementById('change-pass-btn').addEventListener('click', async () => {
+      const current = document.getElementById('current-password').value;
+      const ne = document.getElementById('new-password').value;
+      const resp = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: current, newPassword: ne })
+      });
+      const msg = document.getElementById('change-pass-msg');
+      if (resp.ok) {
+        msg.textContent = 'Password changed successfully';
+        msg.style.color = 'green';
+      } else {
+        const err = await resp.json();
+        msg.textContent = err.error || 'Error';
+        msg.style.color = 'red';
+      }
+    });
+
+    // On load
+    fetchProfile();
+    fetchUserPins();
+  </script>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Skate Interactive Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: sans-serif;
+    }
+
+    #map {
+      height: 80vh;
+      width: 100%;
+    }
+
+    .pin-form-container {
+      position: absolute;
+      background: white;
+      border: 1px solid #444;
+      padding: 8px;
+      display: none;
+      z-index: 1000;
+    }
+
+    .pin-marker {
+      width: 24px;
+      height: 24px;
+      background: red;
+      border-radius: 50%;
+      transform: translate(-50%, -100%);
+    }
+
+    #submissions {
+      padding: 10px;
+    }
+
+    #pins-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    #auth-box {
+      padding: 10px;
+      border-bottom: 1px solid #ccc;
+      background: #f7f7f7;
+    }
+
+    #auth-box input {
+      margin: 0 5px 5px 0;
+    }
+
+    #auth-status {
+      font-weight: bold;
+      color: green;
+    }
+
+    #auth-error {
+      color: red;
+    }
+    #discord-link {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #5865F2;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      z-index: 9999;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      transition: background 0.3s;
+}
+    #discord-link:hover {
+      background: #404EED;
+}
+  </style>
+</head>
+<body>
+
+  <div id="auth-box">
+    <div id="auth-forms">
+      <input type="text" id="username" placeholder="Username" />
+      <input type="password" id="password" placeholder="Password" />
+      <button id="signup">Sign Up</button>
+      <button id="login">Login</button>
+      <br>
+      <a href="/reset-password">Forgot password?</a>
+    </div>
+    <div id="auth-logout" style="display:none;">
+      Logged in as <span id="auth-user"></span>
+      <button id="logout">Logout</button>
+    </div>
+    <div id="auth-status"></div>
+    <div id="auth-error"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Form Popup -->
+  <div id="pin-form" class="pin-form-container">
+    <label>Title: <input type="text" id="pin-title" /></label><br>
+    <label>Description:<br><textarea id="pin-description"></textarea></label><br>
+    <button id="pin-submit">Submit</button>
+    <button id="pin-cancel">Cancel</button>
+  </div>
+
+  <!-- Submission List -->
+  <div id="submissions">
+    <h2>Submitted Pins</h2>
+    <ul id="pins-list"></ul>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const mapWidth = 4824;
+    const mapHeight = 2952;
+    const maxZoom = 5;
+    const tileSize = 256;
+
+    let isLoggedIn = false;
+    let currentUser = null;
+
+    const map = L.map('map', {
+      crs: L.CRS.Simple,
+      minZoom: 0,
+      maxZoom: maxZoom,
+      zoom: 2,
+      center: [mapHeight / 2, mapWidth / 2],
+      maxBounds: [[0, 0], [mapHeight, mapWidth]]
+    });
+
+    L.tileLayer('tiles/{z}/{x}_{y}.jpg', {
+      tileSize: tileSize,
+      minZoom: 0,
+      maxZoom: maxZoom,
+      noWrap: true,
+      bounds: [[0, 0], [mapHeight, mapWidth]]
+    }).addTo(map);
+
+    const pinForm = document.getElementById('pin-form');
+    const pinTitle = document.getElementById('pin-title');
+    const pinDescription = document.getElementById('pin-description');
+    const pinSubmit = document.getElementById('pin-submit');
+    const pinCancel = document.getElementById('pin-cancel');
+    const pinsListEl = document.getElementById('pins-list');
+
+    const authBox = document.getElementById('auth-box');
+    const authStatus = document.getElementById('auth-status');
+    const authError = document.getElementById('auth-error');
+    const authForms = document.getElementById('auth-forms');
+    const authLogout = document.getElementById('auth-logout');
+    const authUser = document.getElementById('auth-user');
+
+    const loginBtn = document.getElementById('login');
+    const signupBtn = document.getElementById('signup');
+    const logoutBtn = document.getElementById('logout');
+
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+
+    let clickCoords = null;
+
+    map.on('click', function (e) {
+      if (!isLoggedIn) {
+        alert("You must be logged in to submit pins.");
+        return;
+      }
+
+      const { lat, lng } = e.latlng;
+      clickCoords = { x_pct: lng / mapWidth, y_pct: lat / mapHeight };
+      pinForm.style.left = e.originalEvent.pageX + 'px';
+      pinForm.style.top = e.originalEvent.pageY + 'px';
+      pinForm.style.display = 'block';
+    });
+
+    pinCancel.addEventListener('click', () => {
+      pinForm.style.display = 'none';
+    });
+
+    pinSubmit.addEventListener('click', () => {
+      const title = pinTitle.value.trim();
+      const description = pinDescription.value.trim();
+      if (!title || !description || !clickCoords) return;
+
+      const payload = {
+        title,
+        description,
+        x_pct: clickCoords.x_pct,
+        y_pct: clickCoords.y_pct
+      };
+
+      fetch('/api/pins-with-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(res => {
+        if (!res.ok) throw new Error("Auth error or upload failed");
+        return res.json();
+      }).then(data => {
+        pinForm.style.display = 'none';
+        pinTitle.value = '';
+        pinDescription.value = '';
+        loadPins();
+      }).catch(err => {
+        alert(err.message);
+      });
+    });
+
+    function createPinMarker(pin) {
+      const y = pin.y_pct * mapHeight;
+      const x = pin.x_pct * mapWidth;
+
+      const markerEl = L.divIcon({
+        className: 'pin-marker',
+        iconSize: [24, 24]
+      });
+
+      const marker = L.marker([y, x], { icon: markerEl })
+        .addTo(map)
+        .bindPopup(`<strong>${pin.title}</strong><br>${pin.description}`);
+    }
+
+    function loadPins() {
+      fetch('/api/pins')
+        .then(res => res.json())
+        .then(pins => {
+          pinsListEl.innerHTML = '';
+          map.eachLayer(layer => {
+            if (layer instanceof L.Marker) map.removeLayer(layer);
+          });
+
+          pins.forEach(pin => {
+            createPinMarker(pin);
+            const li = document.createElement('li');
+            li.textContent = `${pin.title}: ${pin.description}`;
+            pinsListEl.appendChild(li);
+          });
+        });
+    }
+
+    function checkAuthStatus() {
+      fetch('/api/pins') // If session cookie works, user is logged in
+        .then(() => {
+          isLoggedIn = true;
+          currentUser = 'user'; // You can store user info if returned
+          authForms.style.display = 'none';
+          authLogout.style.display = 'block';
+          authUser.textContent = 'Logged In';
+          authStatus.textContent = '✅ Authenticated';
+        })
+        .catch(() => {
+          isLoggedIn = false;
+          authForms.style.display = 'block';
+          authLogout.style.display = 'none';
+          authStatus.textContent = '';
+        });
+    }
+
+    loginBtn.addEventListener('click', () => {
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      }).then(res => {
+        if (!res.ok) throw new Error("Login failed");
+        return res.json();
+      }).then(data => {
+        checkAuthStatus();
+        usernameInput.value = '';
+        passwordInput.value = '';
+      }).catch(err => {
+        authError.textContent = err.message;
+      });
+    });
+
+    signupBtn.addEventListener('click', () => {
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      fetch('/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      }).then(res => {
+        if (!res.ok) throw new Error("Signup failed");
+        return res.json();
+      }).then(data => {
+        checkAuthStatus();
+        usernameInput.value = '';
+        passwordInput.value = '';
+      }).catch(err => {
+        authError.textContent = err.message;
+      });
+    });
+
+    logoutBtn.addEventListener('click', () => {
+      fetch('/auth/logout', { method: 'POST' })
+        .then(() => {
+          isLoggedIn = false;
+          authForms.style.display = 'block';
+          authLogout.style.display = 'none';
+          authUser.textContent = '';
+          authStatus.textContent = 'Logged out';
+        });
+    });
+
+    checkAuthStatus();
+    loadPins();
+  </script>
+<a href="https://discord.gg/YOUR_INVITE_CODE" target="_blank" id="discord-link">
+  💬 Join our Discord
+</a>
+</body>
+</html>
