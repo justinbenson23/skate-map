@@ -9,13 +9,14 @@ const passport = require('passport');
 const session = require('express-session');
 const LocalStrategy = require('passport-local').Strategy;
 const User = require('./models/User');
+const MongoStore = require('connect-mongo');
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('✅ Connected to MongoDB via Mongoose'))
-.catch(err => console.error('❌ MongoDB connection error:', err));
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ Connected to MongoDB via Mongoose'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,6 +37,16 @@ app.use(session({
     // secure: true, // only use in production with HTTPS
     sameSite: 'lax'
   }
+}));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'keyboard cat',
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI
+  }),
+  cookie: { secure: true } // Set to true if using HTTPS
 }));
 
 app.use(passport.initialize());

@@ -131,7 +131,8 @@
       maxZoom: maxZoom,
       zoom: 2,
       center: [mapHeight / 2, mapWidth / 2],
-      maxBounds: [[0, 0], [mapHeight, mapWidth]]
+      maxBounds: [[0, 0], [mapHeight, mapWidth]],
+      maxBoundsViscosity: 1.0
     });
 
     L.tileLayer('/tiles/{z}/{x}_{y}.jpg', {
@@ -140,7 +141,11 @@
       maxZoom: maxZoom,
       noWrap: true,
       bounds: [[0, 0], [mapHeight, mapWidth]]
-    }).addTo(map);
+    })
+    .on('tileerror', function(e) {
+      console.warn('Missing tile:', e.tile.src);
+  })
+    .addTo(map);
 
     const pinForm = document.getElementById('pin-form');
     const pinTitle = document.getElementById('pin-title');
