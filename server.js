@@ -3,16 +3,19 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const B2 = require('backblaze-b2');
-const mongodb = require('mongodb');
+const mongoose = require('mongoose');
 const Pin = require('./models/Pin'); // Load model
 const passport = require('passport');
 const session = require('express-session');
 const LocalStrategy = require('passport-local').Strategy;
 const User = require('./models/User');
 
-mongodb.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('✅ Connected to MongoDB via Mongoose'))
+.catch(err => console.error('❌ MongoDB connection error:', err));
 
 const app = express();
 const PORT = 3000;
