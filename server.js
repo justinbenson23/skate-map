@@ -18,33 +18,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Admin route middleware
-const requireAdmin = (req, res, next) => {
-  const key = req.query.key;
-  if (key !== process.env.ADMIN_KEY) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  next();
-};
-
-// View all pins
-app.get('/api/admin/pins', requireAdmin, async (req, res) => {
-  const pins = await Pin.find().sort({ timestamp: -1 });
-  res.json(pins);
-});
-
-// Delete pin
-app.delete('/api/admin/pin/:id', requireAdmin, async (req, res) => {
-  await Pin.findByIdAndDelete(req.params.id);
-  res.json({ success: true });
-});
-
-// Unflag pin
-app.post('/api/admin/pin/:id/unflag', requireAdmin, async (req, res) => {
-  await Pin.findByIdAndUpdate(req.params.id, { flagged: false });
-  res.json({ success: true });
-});
-
 
 // ===== Multer setup for media uploads =====
 const upload = multer({
@@ -271,6 +244,41 @@ app.post('/admin/pin/:id/delete', adminAuth, async (req, res) => {
   await Pin.findByIdAndDelete(req.params.id);
   res.redirect('/admin/flagged-pins?key=' + req.query.key);
 });
+
+console.log("Query Key:", req.query.key);
+console.log("Env ADMIN_KEY:", process.env.ADMIN_KEY);
+
+// Admin route middleware
+const requireAdmin = (req, res, next) => {
+  const key = req.query.key;
+  if (key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+};
+
+// View all pins
+app.get('/api/admin/pins', requireAdmin, async (req, res) => {
+  try {
+    const pins = await Pin.find().sort({ timestamp: -1 });
+    res.json(pins);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get pins' });
+  }
+});
+
+// Delete pin
+app.delete('/api/admin/pin/:id', requireAdmin, async (req, res) => {
+  await Pin.findByIdAndDelete(req.params.id);
+  res.json({ success: true });
+});
+
+// Unflag pin
+app.post('/api/admin/pin/:id/unflag', requireAdmin, async (req, res) => {
+  await Pin.findByIdAndUpdate(req.params.id, { flagged: false });
+  res.json({ success: true });
+});
+
 
 // Start server
 app.listen(PORT, () => {
