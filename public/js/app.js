@@ -2,6 +2,7 @@ const mapImage = document.getElementById('mapImage');
 const pinForm = document.getElementById('pin-form');
 const pinTitle = document.getElementById('pin-title');
 const pinDescription = document.getElementById('pin-description');
+const pinMediaInput = document.getElementById('pin-media');
 const pinSubmit = document.getElementById('pin-submit');
 const pinCancel = document.getElementById('pin-cancel');
 const pinsListEl = document.getElementById('pins-list');
@@ -19,6 +20,8 @@ mapImage.addEventListener('click', (e) => {
 
   clickCoords = { x_pct, y_pct };
 
+  pinForm.style.left = e.pageX + 'px';
+  pinForm.style.top = e.pageY + 'px';
   pinForm.style.display = 'block';
 });
 
@@ -27,41 +30,58 @@ pinCancel.addEventListener('click', () => {
   pinForm.style.display = 'none';
 });
 
+// Validate uploads
+pinMediaInput.addEventListener('change', () => {
+  const files = Array.from(pinMediaInput.files);
+  let imageCount = 0;
+  let videoCount = 0;
+
+  for (const file of files) {
+    if (file.type.startsWith('image/')) imageCount++;
+    if (file.type.startsWith('video/')) videoCount++;
+  }
+
+  if (imageCount > 2 || videoCount > 1) {
+    alert('You can upload up to 2 images and 1 video only.');
+    pinMediaInput.value = '';
+  }
+});
+
 // Submit pin
 pinSubmit.addEventListener('click', async () => {
   const title = pinTitle.value.trim();
   const description = pinDescription.value.trim();
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
+  const files = pinMediaInput.files;
 
-  fileInput.accept = 'image/*,video/*';
-  fileInput.onchange = async () => {
-    const file = fileInput.files[0];
-    if (!file || !title || !description || !clickCoords) return alert('All fields are required.');
+  if (!title || !description || !clickCoords || files.length === 0) {
+    return alert('All fields and at least one file are required.');
+  }
 
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('description', description);
-    formData.append('x_pct', clickCoords.x_pct);
-    formData.append('y_pct', clickCoords.y_pct);
+  const formData = new FormData();
+  formData.append('title', title);
+  formData.append('description', description);
+  formData.append('x_pct', clickCoords.x_pct);
+  formData.append('y_pct', clickCoords.y_pct);
+
+  for (const file of files) {
     formData.append('media', file);
+  }
 
-    try {
-      await fetch('/api/pins-with-media', {
-        method: 'POST',
-        body: formData
-      });
-      pinForm.style.display = 'none';
-      pinTitle.value = '';
-      pinDescription.value = '';
-      loadPins();
-    } catch (err) {
-      console.error('Upload failed', err);
-      alert('Error submitting pin');
-    }
-  };
+  try {
+    await fetch('/api/pins-with-media', {
+      method: 'POST',
+      body: formData
+    });
 
-  fileInput.click();
+    pinForm.style.display = 'none';
+    pinTitle.value = '';
+    pinDescription.value = '';
+    pinMediaInput.value = '';
+    loadPins();
+  } catch (err) {
+    console.error('Upload failed', err);
+    alert('Error submitting pin');
+  }
 });
 
 // Load and render pins
@@ -79,10 +99,6 @@ async function loadPins() {
     pinEl.style.top = (pin.y_pct * mapImage.offsetHeight) + 'px';
 
     pinEl.addEventListener('click', () => {
-      const mediaHTML = pin.mediaType === 'image'
-      ? `<img src="${pin.mediaUrl}" alt="media" width="200">`
-      : `<video src="${pin.mediaUrl}" width="200" controls></video>`;
-
       const popup = document.createElement('div');
       popup.style.position = 'fixed';
       popup.style.top = '50%';
@@ -93,26 +109,36 @@ async function loadPins() {
       popup.style.border = '1px solid #ccc';
       popup.style.zIndex = 9999;
 
+      let mediaHTML = '';
+      if (Array.isArray(pin.media)) {
+        pin.media.forEach(media => {
+          if (media.type === 'image') {
+            mediaHTML += `<img src="${media.url}" alt="media" width="200"><br>`;
+          } else if (media.type === 'video') {
+            mediaHTML += `<video src="${media.url}" width="200" controls></video><br>`;
+          }
+        });
+      }
+
       popup.innerHTML = `
         <h3>${pin.title}</h3>
         <p>${pin.description}</p>
-        ${mediaHTML}<br><br>
+        ${mediaHTML}<br>
         <button id="report-pin-btn">🚩 Report Inappropriate</button>
         <button id="close-pin-btn">Close</button>
-    `;
+      `;
 
-    document.body.appendChild(popup);
+      document.body.appendChild(popup);
 
-    document.getElementById('report-pin-btn').onclick = async () => {
-      await fetch(`/api/pin/${pin._id}/report`, { method: 'POST' });
-      alert('Thanks for reporting. This pin will be reviewed.');
-      popup.remove();
-      loadPins();
-    };
+      document.getElementById('report-pin-btn').onclick = async () => {
+        await fetch(`/api/pin/${pin._id}/report`, { method: 'POST' });
+        alert('Thanks for reporting. This pin will be reviewed.');
+        popup.remove();
+        loadPins();
+      };
 
-    document.getElementById('close-pin-btn').onclick = () => popup.remove();
-});
-
+      document.getElementById('close-pin-btn').onclick = () => popup.remove();
+    });
 
     document.getElementById('viewer').appendChild(pinEl);
 

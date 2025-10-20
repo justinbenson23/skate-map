@@ -88,6 +88,37 @@
     #discord-link:hover {
       background: #404EED;
     }
+
+    .popup-gallery {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      padding: 16px;
+      border: 1px solid #ccc;
+      z-index: 9999;
+      max-height: 80vh;
+      overflow-y: auto;
+      width: 400px;
+    }
+
+    .popup-gallery img,
+    .popup-gallery video {
+      max-width: 100%;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .popup-gallery h3 {
+      margin-top: 0;
+    }
+
+    .popup-gallery button {
+      margin-top: 10px;
+      display: block;
+      padding: 6px 10px;
+    }
   </style>
 </head>
 <body>
@@ -97,10 +128,12 @@
   </div>
 
   <div id="pin-form">
-    <label>Title: <input type="text" id="pin-title" /></label><br>
-    <label>Description:<br><textarea id="pin-description"></textarea></label><br>
-    <button id="pin-submit">Submit</button>
-    <button id="pin-cancel">Cancel</button>
+    <h3>Add a New Spot</h3>
+    <label>Title: <input type="text" id="pin-title" /></label><br><br>
+    <label>Description:<br><textarea id="pin-description"></textarea></label><br><br>
+    <label>Media (up to 2 images, 1 video): <input type="file" id="pin-media" accept="image/*,video/*" multiple /></label><br><br>
+    <button id="pin-submit">📍 Submit</button>
+    <button id="pin-cancel">❌ Cancel</button>
   </div>
 
   <div id="submissions">
