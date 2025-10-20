@@ -1,142 +1,125 @@
-// ===== CONFIG =====
-const mapWidth  = 4824;
-const mapHeight = 2952;
+const mapImage = document.getElementById('mapImage');
+const pinForm = document.getElementById('pin-form');
+const pinTitle = document.getElementById('pin-title');
+const pinDescription = document.getElementById('pin-description');
+const pinSubmit = document.getElementById('pin-submit');
+const pinCancel = document.getElementById('pin-cancel');
+const pinsListEl = document.getElementById('pins-list');
 
-// ===== AUTH STATE =====
-let isLoggedIn   = false;
-let currentUser  = null;
+let clickCoords = null;
 
-// ===== DOM ELEMENTS =====
-const viewer        = document.getElementById('viewer');
-const mapImage      = document.getElementById('mapImage');
-const btnLogin      = document.getElementById('btn‑login');
-const btnSignup     = document.getElementById('btn‑signup');
-const btnLogout     = document.getElementById('btn‑logout');
-const loggedInText  = document.getElementById('logged‑in‑text');
-const btnDiscord    = document.getElementById('btn‑discord');
+// Handle click on map image
+mapImage.addEventListener('click', (e) => {
+  const rect = mapImage.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
 
-const pinForm       = document.getElementById('pin‑form');
-const pinTitleEl    = document.getElementById('pin‑title');
-const pinDescEl     = document.getElementById('pin‑description');
-const pinMediaType  = document.getElementById('pin‑mediaType');
-const pinUploadEl   = document.getElementById('pin‑mediaUpload');
-const pinSubmit     = document.getElementById('pin‑submit');
-const pinCancel     = document.getElementById('pin‑cancel');
+  const x_pct = x / mapImage.offsetWidth;
+  const y_pct = y / mapImage.offsetHeight;
 
-const pinsListEl    = document.getElementById('pins‑list');
+  clickCoords = { x_pct, y_pct };
 
-// ===== PAN & ZOOM SETUP using panzoom library :contentReference[oaicite:0]{index=0}
-const panzoomInstance = Panzoom(viewer, {
-  maxScale: 4,
-  minScale: 0.5,
-  contain: 'invert'
+  pinForm.style.display = 'block';
 });
-viewer.parentElement.addEventListener('wheel', panzoomInstance.zoomWithWheel);
 
-// ===== PIN DATA & RENDERING =====
-let pins = [];
+// Cancel pin
+pinCancel.addEventListener('click', () => {
+  pinForm.style.display = 'none';
+});
 
-// Fetch pins from backend
+// Submit pin
+pinSubmit.addEventListener('click', async () => {
+  const title = pinTitle.value.trim();
+  const description = pinDescription.value.trim();
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+
+  fileInput.accept = 'image/*,video/*';
+  fileInput.onchange = async () => {
+    const file = fileInput.files[0];
+    if (!file || !title || !description || !clickCoords) return alert('All fields are required.');
+
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('x_pct', clickCoords.x_pct);
+    formData.append('y_pct', clickCoords.y_pct);
+    formData.append('media', file);
+
+    try {
+      await fetch('/api/pins-with-media', {
+        method: 'POST',
+        body: formData
+      });
+      pinForm.style.display = 'none';
+      pinTitle.value = '';
+      pinDescription.value = '';
+      loadPins();
+    } catch (err) {
+      console.error('Upload failed', err);
+      alert('Error submitting pin');
+    }
+  };
+
+  fileInput.click();
+});
+
+// Load and render pins
 async function loadPins() {
   const res = await fetch('/api/pins');
-  pins      = await res.json();
-  renderPins();
-}
+  const pins = await res.json();
 
-function renderPins() {
-  // remove existing pins
-  document.querySelectorAll('.pin').forEach(el => el.remove());
+  document.querySelectorAll('.pin').forEach(p => p.remove());
+  pinsListEl.innerHTML = '';
 
   pins.forEach(pin => {
-    const el = document.createElement('div');
-    el.className     = 'pin';
-    el.title         = pin.title;
-    el.style.left    = (pin.x_pct * mapWidth) + 'px';
-    el.style.top     = (pin.y_pct * mapHeight) + 'px';
-    el.addEventListener('click', () => {
-      window.open(pin.mediaUrl, '_blank');
-    });
-    viewer.appendChild(el);
+    const pinEl = document.createElement('div');
+    pinEl.className = 'pin';
+    pinEl.style.left = (pin.x_pct * mapImage.offsetWidth) + 'px';
+    pinEl.style.top = (pin.y_pct * mapImage.offsetHeight) + 'px';
+
+    pinEl.addEventListener('click', () => {
+      const mediaHTML = pin.mediaType === 'image'
+      ? `<img src="${pin.mediaUrl}" alt="media" width="200">`
+      : `<video src="${pin.mediaUrl}" width="200" controls></video>`;
+
+      const popup = document.createElement('div');
+      popup.style.position = 'fixed';
+      popup.style.top = '50%';
+      popup.style.left = '50%';
+      popup.style.transform = 'translate(-50%, -50%)';
+      popup.style.background = '#fff';
+      popup.style.padding = '16px';
+      popup.style.border = '1px solid #ccc';
+      popup.style.zIndex = 9999;
+
+      popup.innerHTML = `
+        <h3>${pin.title}</h3>
+        <p>${pin.description}</p>
+        ${mediaHTML}<br><br>
+        <button id="report-pin-btn">🚩 Report Inappropriate</button>
+        <button id="close-pin-btn">Close</button>
+    `;
+
+    document.body.appendChild(popup);
+
+    document.getElementById('report-pin-btn').onclick = async () => {
+      await fetch(`/api/pin/${pin._id}/report`, { method: 'POST' });
+      alert('Thanks for reporting. This pin will be reviewed.');
+      popup.remove();
+      loadPins();
+    };
+
+    document.getElementById('close-pin-btn').onclick = () => popup.remove();
+});
+
+
+    document.getElementById('viewer').appendChild(pinEl);
+
+    const li = document.createElement('li');
+    li.textContent = `${pin.title}: ${pin.description}`;
+    pinsListEl.appendChild(li);
   });
 }
 
-// ===== ADD PIN FLOW =====
-viewer.addEventListener('dblclick', (e) => {
-  if (!isLoggedIn) {
-    alert('Please log in to add a pin');
-    return;
-  }
-  const rect = viewer.getBoundingClientRect();
-  const xPct = (e.clientX - rect.left    ) / rect.width;
-  const yPct = (e.clientY - rect.top     ) / rect.height;
-
-  // Store relative coords
-  pinForm.style.display = 'flex';
-  pinSubmit.onclick    = async () => {
-    const payload = {
-      title       : pinTitleEl.value,
-      description : pinDescEl.value,
-      x_pct       : xPct,
-      y_pct       : yPct,
-      mediaType   : pinMediaType.value
-    };
-    const mediaFile = pinUploadEl.files[0];
-    const form    = new FormData();
-    form.append('payload', JSON.stringify(payload));
-    form.append('file',    mediaFile);
-
-    const res = await fetch('/api/pins', {
-      method : 'POST',
-      body   : form
-    });
-    const data = await res.json();
-    pinForm.style.display = 'none';
-    loadPins();
-  };
-
-  pinCancel.onclick = () => {
-    pinForm.style.display = 'none';
-  };
-});
-
-// ===== AUTH UI CALL‑BACKS =====
-btnLogin.onclick  = () => { /* show login UI, not shown here for brevity */ };
-btnSignup.onclick = () => { /* show signup UI, not shown here for brevity */ };
-btnLogout.onclick = async () => {
-  await fetch('/api/logout', { method: 'POST' });
-  isLoggedIn  = false;
-  currentUser = null;
-  updateAuthUI();
-};
-
-function updateAuthUI() {
-  if (isLoggedIn) {
-    loggedInText.innerText     = `Logged in as ${currentUser.username}`;
-    btnLogin.style.display     = 'none';
-    btnSignup.style.display    = 'none';
-    btnLogout.style.display    = '';
-  } else {
-    loggedInText.innerText     = 'Logged out';
-    btnLogin.style.display     = '';
-    btnSignup.style.display    = '';
-    btnLogout.style.display    = 'none';
-  }
-}
-
-async function checkAuth() {
-  const res = await fetch('/api/me');
-  if (res.ok) {
-    currentUser = await res.json();
-    isLoggedIn  = true;
-  } else {
-    isLoggedIn  = false;
-    currentUser = null;
-  }
-  updateAuthUI();
-}
-
-// ===== INIT =====
-(async () => {
-  await checkAuth();
-  await loadPins();
-})();
+loadPins();

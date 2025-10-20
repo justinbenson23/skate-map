@@ -4,88 +4,25 @@ const multer = require('multer');
 const path = require('path');
 const B2 = require('backblaze-b2');
 const mongoose = require('mongoose');
-const Pin = require('./models/Pin'); // Load model
-const passport = require('passport');
-const session = require('express-session');
-const LocalStrategy = require('passport-local').Strategy;
-const User = require('./models/User');
-const MongoStore = require('connect-mongo');
+const Pin = require('./models/Pin');
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB via Mongoose'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
-
-
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
 
+// ===== Middleware =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-// ===== In-memory pin store (replace with DB later) =====
-//===let pins = [];
-// --- Session & Passport setup ---
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'some default secret', 
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    // secure: true, // only use in production with HTTPS
-    sameSite: 'lax'
-  }
-}));
-
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'keyboard cat',
-  resave: false,
-  saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGODB_URI
-  }),
-  cookie: { secure: true } // Set to true if using HTTPS
-}));
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Passport Local Strategy
-passport.use(new LocalStrategy(async (username, password, done) => {
-  try {
-    const user = await User.findOne({ username });
-    if (!user) {
-      return done(null, false, { message: 'Incorrect username.' });
-    }
-    const ok = await user.verifyPassword(password);
-    if (!ok) {
-      return done(null, false, { message: 'Incorrect password.' });
-    }
-    return done(null, user);
-  } catch (err) {
-    return done(err);
-  }
-}));
-
-passport.serializeUser((user, done) => {
-  done(null, user._id);
-});
-passport.deserializeUser(async (id, done) => {
-  try {
-    const user = await User.findById(id);
-    done(null, user);
-  } catch (err) {
-    done(err);
-  }
-});
 
 // ===== Multer setup for media uploads =====
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 25 * 1024 * 1024, // Max file size = 25MB
+    fileSize: 25 * 1024 * 1024,
   },
 });
 
@@ -95,14 +32,10 @@ const b2 = new B2({
   applicationKey: process.env.B2_APPLICATION_KEY,
 });
 
-// ===== Upload helper =====
+// ===== Helper to upload to B2 =====
 async function uploadToB2(buffer, filename, contentType) {
-  await b2.authorize(); // must be done before any call
-
-  const { data: uploadUrlData } = await b2.getUploadUrl({
-    bucketId: process.env.B2_BUCKET_ID,
-  });
-
+  await b2.authorize();
+  const { data: uploadUrlData } = await b2.getUploadUrl({ bucketId: process.env.B2_BUCKET_ID });
   const { uploadUrl, authorizationToken } = uploadUrlData;
 
   await b2.uploadFile({
@@ -113,103 +46,40 @@ async function uploadToB2(buffer, filename, contentType) {
     mime: contentType,
   });
 
-  // Construct public URL
   return `https://f000.backblazeb2.com/file/${process.env.B2_BUCKET_ID}/${filename}`;
 }
 
-// --- Authentication Routes ---
+// ===== API Routes =====
 
-// Signup
-app.post('/auth/signup', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required.' });
-  }
-  try {
-    const existing = await User.findOne({ username });
-    if (existing) {
-      return res.status(400).json({ error: 'Username already taken.' });
-    }
-    const user = await User.register(username, password);
-    req.login(user, err => {
-      if (err) return res.status(500).json({ error: 'Login after signup failed.' });
-      return res.json({ message: 'Signup successful', user: { id: user._id, username: user.username } });
-    });
-  } catch (err) {
-    console.error('Signup error:', err);
-    return res.status(500).json({ error: 'Internal error' });
-  }
-});
-
-// Login
-app.post('/auth/login', passport.authenticate('local'), (req, res) => {
-  res.json({ message: 'Login successful', user: { id: req.user._id, username: req.user.username } });
-});
-
-// Logout
-app.post('/auth/logout', (req, res, next) => {
-  req.logout(err => {
-    if (err) return next(err);
-    res.json({ message: 'Logged out' });
-  });
-});
-
-// --- Middleware to require authentication for certain routes ---
-//function ensureAuthenticated(req, res, next) {
-  //if (req.isAuthenticated && req.isAuthenticated()) {
-   // return next();
- // }
- // return res.status(401).json({ error: 'Authentication required' });
-//}
-
-// --- Pin routes: only authenticated users can post with media ---
-
-const bcrypt = require('bcrypt');
-const crypto = require('crypto');
-
-const ensureAuthenticated = (req, res, next) => {
-  if (req.isAuthenticated && req.isAuthenticated()) return next();
-  return res.status(401).json({ error: 'Authentication required' });
-};
-
-app.get('/api/user/profile', ensureAuthenticated, async (req, res) => {
-  // you may want to hide sensitive fields
-  res.json({ id: req.user._id, username: req.user.username });
-});
-
+// Get all pins (with optional filtering)
 app.get('/api/pins', async (req, res) => {
+  const { filter } = req.query;
+  let sort = { timestamp: -1 };
+
+  if (filter === 'popular') sort = { likesCount: -1 };
+  if (filter === 'newest') sort = { timestamp: -1 };
+
   try {
-    const pins = await Pin.find().sort({ timestamp: -1 });
+    const pins = await Pin.find({ flagged: { $ne: true } }).sort(sort).limit(100);
     res.json(pins);
   } catch (err) {
-    console.error('Fetch pins error:', err);
+    console.error('Error fetching pins:', err);
     res.status(500).json({ error: 'Failed to fetch pins' });
   }
 });
-// User’s pins
-app.get('/api/user/pins', ensureAuthenticated, async (req, res) => {
-  try {
-    const pins = await Pin.find({ userId: req.user._id }).sort({ timestamp: -1 });
-    res.json(pins);
-  } catch (err) {
-    console.error('Error fetching user pins:', err);
-    res.status(500).json({ error: 'Failed to fetch your pins' });
-  }
-});
 
-app.post('/api/pins-with-media', ensureAuthenticated, upload.single('media'), async (req, res) => {
+// Submit pin with media
+app.post('/api/pins-with-media', upload.single('media'), async (req, res) => {
   try {
-    // reuse your file handling logic
     const file = req.file;
     const { title, description, x_pct, y_pct } = req.body;
     if (!file) return res.status(400).json({ error: 'Media file required' });
 
     const mime = file.mimetype;
     let mediaType;
+
     if (mime.startsWith('image/')) {
-      if (file.size > 1 * 1024 * 1024) {
-        return res.status(400).json({ error: 'Image too large' });
-      }
+      if (file.size > 1 * 1024 * 1024) return res.status(400).json({ error: 'Image too large' });
       mediaType = 'image';
     } else if (mime.startsWith('video/')) {
       mediaType = 'video';
@@ -217,297 +87,142 @@ app.post('/api/pins-with-media', ensureAuthenticated, upload.single('media'), as
       return res.status(400).json({ error: 'Unsupported media type' });
     }
 
-    // Create a unique filename
     const ext = path.extname(file.originalname);
     const filename = `pins/${Date.now()}_${Math.random().toString(36).substring(2)}${ext}`;
-
-    // Upload to B2
     const mediaUrl = await uploadToB2(file.buffer, filename, mime);
 
-    // Create pin object
     const newPin = new Pin({
-      userId: req.user._id,
       title,
       description,
       x_pct: parseFloat(x_pct),
       y_pct: parseFloat(y_pct),
       mediaType,
       mediaUrl
-  });
+    });
 
-    const savedPin = await new Pin(newPin).save();
+    const savedPin = await newPin.save();
     res.json(savedPin);
   } catch (err) {
     console.error('Upload failed:', err);
     res.status(500).json({ error: 'Upload failed' });
   }
 });
-// Change password
-app.post('/api/user/change-password', ensureAuthenticated, async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ error: 'Current and new password required' });
-  }
+
+// Toggle complete (no auth → use IP or cookie if needed later)
+app.post('/api/pin/:id/toggle-complete', async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    const match = await user.verifyPassword(currentPassword);
-    if (!match) {
-      return res.status(400).json({ error: 'Current password is incorrect' });
-    }
-    const saltRounds = 10;
-    user.passwordHash = await bcrypt.hash(newPassword, saltRounds);
-    await user.save();
-    res.json({ message: 'Password changed successfully' });
-  } catch (err) {
-    console.error('Change password error:', err);
-    res.status(500).json({ error: 'Password change failed' });
-  }
-});
-
-// Request reset
-app.post('/auth/request-reset', async (req, res) => {
-  const { username } = req.body;
-  if (!username) {
-    return res.status(400).json({ error: 'Username required' });
-  }
-  const user = await User.findOne({ username });
-  // Whether or not user exists, respond with success to avoid enumeration
-  if (user) {
-    // Generate token
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiry = Date.now() + 3600 * 1000; // 1 hour
-
-    user.resetToken = token;
-    user.resetTokenExpiry = new Date(expiry);
-    await user.save();
-
-    // In real: send token via email link
-    // For now, return token so user can test
-    res.json({ message: 'If account exists, reset link is available', token });
-    return;
-  }
-  // Always respond success
-  res.json({ message: 'If account exists, reset link is available' });
-});
-
-// Serve reset‑password UI (could be static page)
-app.get('/reset-password', (req, res) => {
-  // Serve your reset-password.html (in public folder)
-  res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
-});
-
-// Perform reset
-app.post('/auth/reset-password', async (req, res) => {
-  const { token, newPassword } = req.body;
-  if (!token || !newPassword) {
-    return res.status(400).json({ error: 'Token & new password required' });
-  }
-  const user = await User.findOne({
-    resetToken: token,
-    resetTokenExpiry: { $gt: Date.now() }
-  });
-  if (!user) {
-    return res.status(400).json({ error: 'Invalid or expired token' });
-  }
-
-  await user.setPassword(newPassword);
-  res.json({ message: 'Password reset successful' });
-});
-
-// Delete a pin
-app.delete('/api/pin/:id', ensureAuthenticated, async (req, res) => {
-  const pinId = req.params.id;
-  try {
-    const pin = await Pin.findById(pinId);
-    if (!pin) {
-      return res.status(404).json({ error: 'Pin not found' });
-    }
-    if (!pin.userId.equals(req.user._id)) {
-      return res.status(403).json({ error: 'Not authorized to delete this pin' });
-    }
-    await pin.deleteOne();
-    res.json({ message: 'Pin deleted' });
-  } catch (err) {
-    console.error('Delete pin error:', err);
-    res.status(500).json({ error: 'Failed to delete pin' });
-  }
-});
-
-// Toggle “completed” for a pin
-app.post('/api/pin/:id/toggle-complete', ensureAuthenticated, async (req, res) => {
-  const pinId = req.params.id;
-  const userId = req.user._id;
-  try {
-    const pin = await Pin.findById(pinId);
+    const pin = await Pin.findById(req.params.id);
     if (!pin) return res.status(404).json({ error: 'Pin not found' });
 
-    const idx = pin.completedBy.findIndex(uid => uid.equals(userId));
-    if (idx >= 0) {
-      // already completed, so remove
-      pin.completedBy.splice(idx, 1);
-    } else {
-      pin.completedBy.push(userId);
-    }
+    pin.completed = !pin.completed;
     await pin.save();
-    res.json({ completedBy: pin.completedBy });
+    res.json({ completed: pin.completed });
   } catch (err) {
-    console.error('toggle-complete error', err);
-    res.status(500).json({ error: 'Failed to toggle completed' });
+    res.status(500).json({ error: 'Failed to toggle complete' });
   }
 });
 
-// Like / unlike a pin
-app.post('/api/pin/:id/toggle-like', ensureAuthenticated, async (req, res) => {
-  const pinId = req.params.id;
-  const userId = req.user._id;
+// Toggle like (no auth)
+app.post('/api/pin/:id/toggle-like', async (req, res) => {
   try {
-    const pin = await Pin.findById(pinId);
+    const pin = await Pin.findById(req.params.id);
     if (!pin) return res.status(404).json({ error: 'Pin not found' });
 
-    const idx = pin.likedBy.findIndex(uid => uid.equals(userId));
-    if (idx >= 0) {
-      // already liked → unlike
-      pin.likedBy.splice(idx, 1);
-      pin.likesCount = pin.likedBy.length;
-    } else {
-      pin.likedBy.push(userId);
-      pin.likesCount = pin.likedBy.length;
-    }
+    pin.likesCount = (pin.likesCount || 0) + 1;
     await pin.save();
     res.json({ likesCount: pin.likesCount });
   } catch (err) {
-    console.error('toggle-like error', err);
-    res.status(500).json({ error: 'Failed to like/unlike' });
+    res.status(500).json({ error: 'Failed to like pin' });
   }
 });
 
-// Add comment to pin
-app.post('/api/pin/:id/comment', ensureAuthenticated, async (req, res) => {
-  const pinId = req.params.id;
-  const userId = req.user._id;
+// Add comment
+app.post('/api/pin/:id/comment', async (req, res) => {
   const { text } = req.body;
-  if (!text) {
-    return res.status(400).json({ error: 'Comment text required' });
-  }
+  if (!text) return res.status(400).json({ error: 'Comment required' });
+
   try {
-    const pin = await Pin.findById(pinId);
+    const pin = await Pin.findById(req.params.id);
     if (!pin) return res.status(404).json({ error: 'Pin not found' });
 
-    pin.comments.push({ userId, text });
+    pin.comments.push({ text });
     await pin.save();
-    // You may want to return the newly added comment or full pin
     res.json(pin.comments);
   } catch (err) {
-    console.error('comment error', err);
-    res.status(500).json({ error: 'Failed to add comment' });
+    res.status(500).json({ error: 'Failed to comment' });
   }
 });
 
-// Delete comment (only if user is author)
-app.delete('/api/pin/:pinId/comment/:cmtId', ensureAuthenticated, async (req, res) => {
-  const { pinId, cmtId } = req.params;
-  const userId = req.user._id;
+// Report pin
+app.post('/api/pin/:id/report', async (req, res) => {
   try {
-    const pin = await Pin.findById(pinId);
+    const pin = await Pin.findById(req.params.id);
     if (!pin) return res.status(404).json({ error: 'Pin not found' });
 
-    const cmt = pin.comments.id(cmtId);
-    if (!cmt) return res.status(404).json({ error: 'Comment not found' });
-    if (!cmt.userId.equals(userId)) {
-      return res.status(403).json({ error: 'Not authorized to delete this comment' });
-    }
-
-    cmt.remove();  // remove subdocument
+    pin.flagged = true;
     await pin.save();
-    res.json({ comments: pin.comments });
+
+    res.json({ message: 'Pin flagged successfully' });
   } catch (err) {
-    console.error('delete comment error', err);
-    res.status(500).json({ error: 'Failed to delete comment' });
+    res.status(500).json({ error: 'Failed to flag pin' });
   }
 });
+const adminAuth = (req, res, next) => {
+  const adminKey = req.query.key || req.body.key;
+  if (adminKey !== process.env.ADMIN_KEY) {
+    return res.status(403).send('Forbidden: Invalid admin key');
+  }
+  next();
+};
 
-// Get pins with filtering (owner / popular / newest)
-app.get('/api/pins', async (req, res) => {
-  const { filter } = req.query;  // e.g. filter = "mine", "popular", "newest"
-  let query = {};
-  let sort = { timestamp: -1 };
+app.get('/admin/flagged-pins', adminAuth, async (req, res) => {
+  const pins = await Pin.find({ flagged: true }).sort({ timestamp: -1 });
 
-  if (filter === 'mine' && req.user) {
-    query.userId = req.user._id;
-  }
-  if (filter === 'popular') {
-    sort = { likesCount: -1 };
-  }
-  if (filter === 'newest') {
-    sort = { timestamp: -1 };
-  }
-  try {
-    const pins = await Pin.find(query).sort(sort).limit(100);
-    res.json(pins);
-  } catch (err) {
-    console.error('fetch filtered pins error', err);
-    res.status(500).json({ error: 'Failed to fetch pins' });
-  }
+  const html = `
+    <html>
+      <head>
+        <title>Flagged Pins</title>
+        <style>
+          body { font-family: sans-serif; padding: 20px; }
+          .pin { border: 1px solid #ccc; padding: 12px; margin-bottom: 10px; }
+          img, video { max-width: 300px; display: block; margin-top: 10px; }
+          button { margin-right: 10px; }
+        </style>
+      </head>
+      <body>
+        <h1>🚩 Flagged Pins</h1>
+        ${pins.map(pin => `
+          <div class="pin">
+            <strong>${pin.title}</strong><br>
+            ${pin.description}<br>
+            ${pin.mediaType === 'image' 
+              ? `<img src="${pin.mediaUrl}" />` 
+              : `<video src="${pin.mediaUrl}" controls></video>`}
+            <form method="POST" action="/admin/pin/${pin._id}/unflag?key=${req.query.key}" style="display:inline;">
+              <button type="submit">✅ Unflag</button>
+            </form>
+            <form method="POST" action="/admin/pin/${pin._id}/delete?key=${req.query.key}" style="display:inline;">
+              <button type="submit">🗑️ Delete</button>
+            </form>
+          </div>
+        `).join('')}
+      </body>
+    </html>
+  `;
+  res.send(html);
 });
 
-function createPinMarker(pin) {
-  const y = pin.y_pct * mapHeight;
-  const x = pin.x_pct * mapWidth;
+app.post('/admin/pin/:id/unflag', adminAuth, async (req, res) => {
+  await Pin.findByIdAndUpdate(req.params.id, { flagged: false });
+  res.redirect('/admin/flagged-pins?key=' + req.query.key);
+});
 
-  const marker = L.marker([y, x]).addTo(map);
+app.post('/admin/pin/:id/delete', adminAuth, async (req, res) => {
+  await Pin.findByIdAndDelete(req.params.id);
+  res.redirect('/admin/flagged-pins?key=' + req.query.key);
+});
 
-  // Build popup HTML
-  let popupHtml = `<strong>${pin.title}</strong><br>${pin.description}<br>`;
-  popupHtml += `Likes: <span id="likes-${pin._id}">${pin.likesCount}</span>`;
-  popupHtml += ` <button onclick="toggleLike('${pin._id}')">👍</button><br>`;
-  
-  const done = pin.completedBy && pin.completedBy.includes(currentUserId);
-  popupHtml += `<button onclick="toggleComplete('${pin._id}')">
-                  ${done ? 'Unmark Complete' : 'Mark Complete'}
-                </button><br>`;
-
-  // Comments
-  popupHtml += `<div>`;
-  pin.comments.forEach(c => {
-    popupHtml += `<div><strong>${c.userId}</strong>: ${c.text}</div>`;
-  });
-  popupHtml += `</div>`;
-  popupHtml += `<input type="text" id="comment-input-${pin._id}" placeholder="Add comment" />`;
-  popupHtml += `<button onclick="addComment('${pin._id}')">Comment</button>`;
-
-  marker.bindPopup(popupHtml);
-}
-
-async function loadPins() {
-  const filter = document.getElementById('filter-select').value;
-  const res = await fetch('/api/pins?' + new URLSearchParams({ filter }));
-  const pins = await res.json();
-  // then render them as before
-}
-
-async function toggleLike(pinId) {
-  await fetch(`/api/pin/${pinId}/toggle-like`, { method: 'POST' });
-  loadPins();  // reload to refresh counts
-}
-
-async function toggleComplete(pinId) {
-  await fetch(`/api/pin/${pinId}/toggle-complete`, { method: 'POST' });
-  loadPins();
-}
-
-async function addComment(pinId) {
-  const input = document.getElementById(`comment-input-${pinId}`);
-  const text = input.value;
-  if (!text) return;
-  await fetch(`/api/pin/${pinId}/comment`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text })
-  });
-  loadPins();
-}
-
-// ===== Start server =====
+// Start server
 app.listen(PORT, () => {
-  console.log(`✅ Server running at: http://localhost:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });

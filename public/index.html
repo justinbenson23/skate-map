@@ -21,24 +21,6 @@
       padding: 0 10px;
     }
 
-    #auth-box {
-      padding: 10px;
-      background: #f7f7f7;
-    }
-
-    #auth-box input {
-      margin: 0 5px 5px 0;
-    }
-
-    #auth-status {
-      font-weight: bold;
-      color: green;
-    }
-
-    #auth-error {
-      color: red;
-    }
-
     #viewer {
       position: relative;
       width: 100vw;
@@ -52,7 +34,6 @@
       height: auto;
       max-width: none;
       display: block;
-     
     }
 
     .pin {
@@ -111,23 +92,6 @@
 </head>
 <body>
 
-  <div id="auth-box">
-    <div id="auth-forms">
-      <input type="text" id="username" placeholder="Username" />
-      <input type="password" id="password" placeholder="Password" />
-      <button id="signup">Sign Up</button>
-      <button id="login">Login</button>
-      <br>
-      <a href="/reset-password">Forgot password?</a>
-    </div>
-    <div id="auth-logout" style="display:none;">
-      Logged in as <span id="auth-user"></span>
-      <button id="logout">Logout</button>
-    </div>
-    <div id="auth-status"></div>
-    <div id="auth-error"></div>
-  </div>
-
   <div id="viewer">
     <img id="mapImage" src="img/map.jpg" alt="Game Map">
   </div>
@@ -151,7 +115,7 @@
   <script type="module">
     import panzoom from 'https://unpkg.com/@panzoom/panzoom@4.0.4/dist/panzoom.es.min.js';
 
-    const image = document.getElementById('map');
+    const image = document.getElementById('mapImage');
     panzoom(image, {
       maxZoom: 5,
       minZoom: 0.5,
