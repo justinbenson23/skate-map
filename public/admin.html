@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    h1 { color: #333; }
+    .pin-card {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-left: 4px solid #2c3e50;
+    }
+    .flagged { border-left-color: red; }
+    .pin-card button {
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Admin Dashboard</h1>
+  <div id="pin-list">Loading pins...</div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const key = params.get("key");
+
+    if (!key) {
+      document.getElementById('pin-list').textContent = "Missing ?key= in URL.";
+    } else {
+      fetch(`/api/admin/pins?key=${key}`)
+        .then(res => res.json())
+        .then(pins => {
+          const container = document.getElementById('pin-list');
+          container.innerHTML = '';
+
+          pins.forEach(pin => {
+            const div = document.createElement('div');
+            div.className = 'pin-card' + (pin.flagged ? ' flagged' : '');
+
+            div.innerHTML = `
+              <strong>${pin.title}</strong><br>
+              ${pin.description}<br>
+              <small>${new Date(pin.timestamp).toLocaleString()}</small><br>
+              <em>${pin.media.length} media file(s), ${pin.likesCount} likes</em><br>
+              ${pin.flagged ? '<strong style="color:red;">🚩 Flagged</strong><br>' : ''}
+              <button onclick="deletePin('${pin._id}')">Delete</button>
+              <button onclick="unflagPin('${pin._id}')">Unflag</button>
+            `;
+
+            container.appendChild(div);
+          });
+        });
+
+      function deletePin(id) {
+        fetch(`/api/admin/pin/${id}?key=${key}`, { method: 'DELETE' })
+          .then(() => location.reload());
+      }
+
+      function unflagPin(id) {
+        fetch(`/api/admin/pin/${id}/unflag?key=${key}`, { method: 'POST' })
+          .then(() => location.reload());
+      }
+    }
+  </script>
+</body>
+</html>

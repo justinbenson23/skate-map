@@ -5,11 +5,10 @@ const pinDescription = document.getElementById('pin-description');
 const pinMediaInput = document.getElementById('pin-media');
 const pinSubmit = document.getElementById('pin-submit');
 const pinCancel = document.getElementById('pin-cancel');
-const pinsListEl = document.getElementById('pins-list');
 
 let clickCoords = null;
 
-// Handle click on map image
+// Click on map to open form
 mapImage.addEventListener('click', (e) => {
   const rect = mapImage.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -25,12 +24,12 @@ mapImage.addEventListener('click', (e) => {
   pinForm.style.display = 'block';
 });
 
-// Cancel pin
+// Cancel form
 pinCancel.addEventListener('click', () => {
   pinForm.style.display = 'none';
 });
 
-// Validate uploads
+// Validate media
 pinMediaInput.addEventListener('change', () => {
   const files = Array.from(pinMediaInput.files);
   let imageCount = 0;
@@ -84,46 +83,59 @@ pinSubmit.addEventListener('click', async () => {
   }
 });
 
-// Load and render pins
+// Load pins and avoid overlaps
 async function loadPins() {
   const res = await fetch('/api/pins');
   const pins = await res.json();
 
   document.querySelectorAll('.pin').forEach(p => p.remove());
-  pinsListEl.innerHTML = '';
+
+  const placed = [];
+  const buffer = 1.5;
 
   pins.forEach(pin => {
+    let x = pin.x_pct * 100;
+    let y = pin.y_pct * 100;
+    let attempts = 0;
+
+    // Adjust if overlapping
+    while (attempts < 10 && placed.some(p => Math.abs(p.x - x) < buffer && Math.abs(p.y - y) < buffer)) {
+      x += (Math.random() - 0.5) * buffer;
+      y += (Math.random() - 0.5) * buffer;
+      attempts++;
+    }
+
+    placed.push({ x, y });
+
     const pinEl = document.createElement('div');
     pinEl.className = 'pin';
-    pinEl.style.left = (pin.x_pct * mapImage.offsetWidth) + 'px';
-    pinEl.style.top = (pin.y_pct * mapImage.offsetHeight) + 'px';
+    pinEl.style.left = `${x}%`;
+    pinEl.style.top = `${y}%`;
+    pinEl.title = pin.title; // Tooltip on hover ✅
 
+    // Click to open media popup
     pinEl.addEventListener('click', () => {
       const popup = document.createElement('div');
-      popup.style.position = 'fixed';
-      popup.style.top = '50%';
-      popup.style.left = '50%';
-      popup.style.transform = 'translate(-50%, -50%)';
-      popup.style.background = '#fff';
-      popup.style.padding = '16px';
-      popup.style.border = '1px solid #ccc';
-      popup.style.zIndex = 9999;
+      popup.className = 'popup-gallery';
 
       let mediaHTML = '';
-      if (Array.isArray(pin.media)) {
+      if (Array.isArray(pin.media) && pin.media.length > 0) {
         pin.media.forEach(media => {
           if (media.type === 'image') {
-            mediaHTML += `<img src="${media.url}" alt="media" width="200"><br>`;
+            mediaHTML += `<img src="${media.url}" alt="image" style="max-width: 100%; margin-top: 10px;">`;
           } else if (media.type === 'video') {
-            mediaHTML += `<video src="${media.url}" width="200" controls></video><br>`;
+            mediaHTML += `<video src="${media.url}" controls style="max-width: 100%; margin-top: 10px;"></video>`;
           }
         });
+      } else {
+        mediaHTML = '<p>No media available.</p>';
       }
 
       popup.innerHTML = `
         <h3>${pin.title}</h3>
         <p>${pin.description}</p>
-        ${mediaHTML}<br>
+        ${mediaHTML}
+        <br>
         <button id="report-pin-btn">🚩 Report Inappropriate</button>
         <button id="close-pin-btn">Close</button>
       `;
@@ -141,10 +153,6 @@ async function loadPins() {
     });
 
     document.getElementById('viewer').appendChild(pinEl);
-
-    const li = document.createElement('li');
-    li.textContent = `${pin.title}: ${pin.description}`;
-    pinsListEl.appendChild(li);
   });
 }
 

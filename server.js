@@ -18,6 +18,34 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Admin route middleware
+const requireAdmin = (req, res, next) => {
+  const key = req.query.key;
+  if (key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+};
+
+// View all pins
+app.get('/api/admin/pins', requireAdmin, async (req, res) => {
+  const pins = await Pin.find().sort({ timestamp: -1 });
+  res.json(pins);
+});
+
+// Delete pin
+app.delete('/api/admin/pin/:id', requireAdmin, async (req, res) => {
+  await Pin.findByIdAndDelete(req.params.id);
+  res.json({ success: true });
+});
+
+// Unflag pin
+app.post('/api/admin/pin/:id/unflag', requireAdmin, async (req, res) => {
+  await Pin.findByIdAndUpdate(req.params.id, { flagged: false });
+  res.json({ success: true });
+});
+
+
 // ===== Multer setup for media uploads =====
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -69,35 +97,56 @@ app.get('/api/pins', async (req, res) => {
 });
 
 // Submit pin with media
-app.post('/api/pins-with-media', upload.single('media'), async (req, res) => {
+app.post('/api/pins-with-media', upload.array('media', 3), async (req, res) => {
   try {
-    const file = req.file;
     const { title, description, x_pct, y_pct } = req.body;
-    if (!file) return res.status(400).json({ error: 'Media file required' });
+    const files = req.files;
 
-    const mime = file.mimetype;
-    let mediaType;
-
-    if (mime.startsWith('image/')) {
-      if (file.size > 1 * 1024 * 1024) return res.status(400).json({ error: 'Image too large' });
-      mediaType = 'image';
-    } else if (mime.startsWith('video/')) {
-      mediaType = 'video';
-    } else {
-      return res.status(400).json({ error: 'Unsupported media type' });
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'At least one media file is required' });
     }
 
-    const ext = path.extname(file.originalname);
-    const filename = `pins/${Date.now()}_${Math.random().toString(36).substring(2)}${ext}`;
-    const mediaUrl = await uploadToB2(file.buffer, filename, mime);
+    let imageCount = 0;
+    let videoCount = 0;
+
+    const media = [];
+
+    for (const file of files) {
+      const mime = file.mimetype;
+      let mediaType;
+
+      if (mime.startsWith('image/')) {
+        imageCount++;
+        if (imageCount > 2) {
+          return res.status(400).json({ error: 'Maximum of 2 images allowed' });
+        }
+        if (file.size > 1 * 1024 * 1024) {
+          return res.status(400).json({ error: 'Image too large (max 1MB)' });
+        }
+        mediaType = 'image';
+      } else if (mime.startsWith('video/')) {
+        videoCount++;
+        if (videoCount > 1) {
+          return res.status(400).json({ error: 'Only one video allowed' });
+        }
+        mediaType = 'video';
+      } else {
+        return res.status(400).json({ error: 'Unsupported file type' });
+      }
+
+      const ext = path.extname(file.originalname);
+      const filename = `pins/${Date.now()}_${Math.random().toString(36).substring(2)}${ext}`;
+      const url = await uploadToB2(file.buffer, filename, mime);
+
+      media.push({ url, type: mediaType });
+    }
 
     const newPin = new Pin({
       title,
       description,
       x_pct: parseFloat(x_pct),
       y_pct: parseFloat(y_pct),
-      mediaType,
-      mediaUrl
+      media,
     });
 
     const savedPin = await newPin.save();
@@ -107,6 +156,7 @@ app.post('/api/pins-with-media', upload.single('media'), async (req, res) => {
     res.status(500).json({ error: 'Upload failed' });
   }
 });
+
 
 // Toggle complete (no auth → use IP or cookie if needed later)
 app.post('/api/pin/:id/toggle-complete', async (req, res) => {
