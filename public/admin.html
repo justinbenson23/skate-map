@@ -35,20 +35,31 @@
       document.getElementById('pin-list').textContent = "Missing ?key= in URL.";
     } else {
       fetch(`/api/admin/pins?key=${key}`)
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to fetch pins.");
+          return res.json();
+        })
         .then(pins => {
           const container = document.getElementById('pin-list');
           container.innerHTML = '';
+
+          if (pins.length === 0) {
+            container.textContent = "No pins found.";
+            return;
+          }
 
           pins.forEach(pin => {
             const div = document.createElement('div');
             div.className = 'pin-card' + (pin.flagged ? ' flagged' : '');
 
+            const mediaCount = (Array.isArray(pin.media) && pin.media.length)
+              || (pin.mediaUrl ? 1 : 0);
+
             div.innerHTML = `
               <strong>${pin.title}</strong><br>
               ${pin.description}<br>
               <small>${new Date(pin.timestamp).toLocaleString()}</small><br>
-              <em>${pin.media.length} media file(s), ${pin.likesCount} likes</em><br>
+              <em>${mediaCount} media file(s), ${pin.likesCount} likes</em><br>
               ${pin.flagged ? '<strong style="color:red;">🚩 Flagged</strong><br>' : ''}
               <button onclick="deletePin('${pin._id}')">Delete</button>
               <button onclick="unflagPin('${pin._id}')">Unflag</button>
@@ -56,6 +67,10 @@
 
             container.appendChild(div);
           });
+        })
+        .catch(err => {
+          console.error("Error loading pins:", err);
+          document.getElementById('pin-list').textContent = "Failed to load pins.";
         });
 
       function deletePin(id) {
