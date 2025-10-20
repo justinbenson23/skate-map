@@ -245,7 +245,7 @@ app.post('/admin/pin/:id/delete', adminAuth, async (req, res) => {
   res.redirect('/admin/flagged-pins?key=' + req.query.key);
 });
 
-console.log("Query Key:", req.query.key);
+
 console.log("Env ADMIN_KEY:", process.env.ADMIN_KEY);
 
 // Admin route middleware
