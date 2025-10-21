@@ -129,12 +129,10 @@
 </head>
 <body>
 
-  <!-- The main container for the map viewer -->
   <div id="viewer">
       <img id="mapImage" src="img/map.jpg" alt="Game Map">
   </div>
 
-  <!-- The form for adding a new pin, initially hidden -->
   <div id="pin-form">
     <h3>Add a New Spot</h3>
     <label>Title: <input type="text" id="pin-title" /></label>
@@ -146,54 +144,64 @@
     </div>
   </div>
 
-  <!-- External link, e.g., to a Discord server -->
   <a href="https://discord.gg/" target="_blank" id="discord-link">
     💬 Join our Discord
   </a>
 
   <!-- Panzoom library and map initialization script -->
   <script type="module">
-    // Import the Panzoom library
-    import Panzoom from 'https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js';
+    import Panzoom from '@panzoom/panzoom';
 
-    // Get references to our HTML elements
     const viewer = document.getElementById('viewer');
+    const image = document.getElementById('mapImage');
     
-    // Make the image element and Panzoom instance available globally 
-    // so app.js can access them.
-    window.image = document.getElementById('mapImage');
-    window.panzoom = Panzoom(window.image, {
+    const panzoom = Panzoom(image, {
       maxScale: 5,
       minScale: 0.3,
       contain: 'outside',
       canvas: true
     });
 
-    // Enable wheel zoom
-    viewer.addEventListener('wheel', window.panzoom.zoomWithWheel);
+    viewer.addEventListener('wheel', panzoom.zoomWithWheel);
 
-    // Center the image when it loads
-    window.image.onload = () => {
+    image.onload = () => {
       const viewerWidth = viewer.offsetWidth;
       const viewerHeight = viewer.offsetHeight;
-      const imageWidth = window.image.naturalWidth;
-      const imageHeight = window.image.naturalHeight;
+      const imageWidth = image.naturalWidth;
+      const imageHeight = image.naturalHeight;
 
       const scale = Math.min(viewerWidth / imageWidth, viewerHeight / imageHeight) * 0.8;
       const panX = (viewerWidth - imageWidth * scale) / 2;
       const panY = (viewerHeight - imageHeight * scale) / 2;
 
-      window.panzoom.zoom(scale, { animate: false });
-      window.panzoom.pan(panX, panY, { animate: false });
+      panzoom.zoom(scale, { animate: false });
+      panzoom.pan(panX, panY, { animate: false });
     };
     
-    if (window.image.complete) {
-      window.image.onload();
+    if (image.complete) {
+      image.onload();
     }
+
+    // This is the key change: This script now detects the click and dispatches an event.
+    image.addEventListener('panzoomend', (event) => {
+      const originalEvent = event.detail.originalEvent;
+      if (originalEvent && originalEvent.type.startsWith('pointer')) {
+        if (!event.detail.pan) {
+          // Create and dispatch our custom 'mapclick' event.
+          // We pass the panzoom instance and original event in the detail.
+          const mapClickEvent = new CustomEvent('mapclick', {
+            detail: {
+              panzoom: panzoom,
+              originalEvent: originalEvent
+            }
+          });
+          image.dispatchEvent(mapClickEvent);
+        }
+      }
+    });
   </script>
 
-  <!-- External script for pin-related logic -->
-  <script src="js/app.js"></script>
+  <!-- We use `defer` to ensure this script runs AFTER the module script above has parsed. -->
+  <script src="js/app.js" defer></script>
 </body>
 </html>
-
