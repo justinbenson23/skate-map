@@ -24,10 +24,10 @@
     #viewer {
       position: relative;
       width: 100vw;
-      height: 90vh;
+      height: 100vh;
       background: #000;
-      overflow: auto;
-      border: 2px solid #333;
+      overflow: hidden;
+      
     }
 
     #mapImage {
@@ -136,15 +136,15 @@
   </a>
 
   <script type="module">
-    import panzoom from 'https://unpkg.com/@panzoom/panzoom@4.0.4/dist/panzoom.es.min.js';
+    import Panzoom from 'https://unpkg.com/@panzoom/panzoom@4.0.4/dist/panzoom.es.min.js';
 
     const image = document.getElementById('mapImage');
-    panzoom(image, {
-      maxZoom: 5,
-      minZoom: 0.5,
-      bounds: true,
-      boundsPadding: 0.1
+    const panzoom=Panzoom(image, {
+      maxScale: 5,
+      minScale: 0.5,
+      contain: 'outside',
     });
+  image.parentElement.addEventListener('wheel', panzoom.zoomWithWheel);  
   </script>
 
   <script src="/js/app.js"></script>
