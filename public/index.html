@@ -13,25 +13,24 @@
     }
 
     #viewer {
-      position: relative;
+      
       width: 100vw;
       height: 100vh;
-      background: #000;
       overflow: hidden;
       touch-action: none;
     }
 
     #map-wrapper {
-      display: inline-block;
+      display: block;
     }
 
     #mapImage {
       max-width: none;
-      display: block;
+      
       user-select: none;
       -webkit-user-drag: none;
       cursor: grab;
-      pointer-events: none;
+      pointer-events: auto;
     }
 
     .pin {
@@ -146,22 +145,25 @@
 
     // Center map when image loads
     image.onload = () => {
-      const viewer = wrapper.parentElement;
-      const scale = 0.75;
+      const vw = wrapper.offsetWidth;
+      const vh = wrapper.offsetHeight;
+      const imgW = image.naturalWidth;
+      const imgH = image.naturalHeight;
 
-      const x = (viewer.offsetWidth - image.naturalWidth * scale) / 2;
-      const y = (viewer.offsetHeight - image.naturalHeight * scale) / 2;
+      const initialScale = 0.75;
+      const panX = (vw - imgW * initialScale) / 2;
+      const panY = (vh - imgH * initialScale) / 2;
 
-      panzoom.zoom(scale, { animate: false });
-      panzoom.pan(x, y, { animate: false });
+      panzoom.zoom(initialScale, { animate: false });
+      panzoom.pan(panX, panY, { animate: false });
     };
 
     // Prevent pin form from showing on drag
-    let wasDragging = false;
-    wrapper.addEventListener('pointerdown', () => { wasDragging = false; });
-    wrapper.addEventListener('pointermove', () => { wasDragging = true; });
-    wrapper.addEventListener('click', (e) => {
-      if (!wasDragging) {
+    let isDragging = false;
+    wrapper.addEventListener('pointerdown', () => { isDragging = false; });
+    wrapper.addEventListener('pointermove', () => { isDragging = true; });
+    wrapper.addEventListener('pointerup', (e) => {
+      if (!isDragging) {
         const rect = wrapper.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
