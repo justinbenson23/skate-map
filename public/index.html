@@ -3,218 +3,112 @@
 <head>
   <meta charset="UTF-8">
   <title>Skate Interactive Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    /* Basic reset and full-screen setup */
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      /* IMPORTANT: We let the viewer handle overflow now */
-      overflow: hidden; 
-      background-color: #f0f0f0;
+      font-family: sans-serif;
+      overflow: hidden;
     }
 
-    /* The main viewport for the map */
     #viewer {
       width: 100vw;
       height: 100vh;
-      /* KEY CHANGE: Changed from 'hidden' to 'auto' to enable scrollbars */
-      overflow: auto; 
+      overflow: scroll;
+      background: #000;
+      position: relative;
     }
 
-    /* The image being panned and zoomed. */
     #mapImage {
-      max-width: none; /* Allows the image to be larger than its container */
-      user-select: none; /* Prevents text selection on the image */
-      -webkit-user-drag: none; /* Disables the native browser image drag */
-      /* No cursor change needed as we aren't dragging the image itself */
+      display: block;
+      max-width: none;
+      user-select: none;
+      -webkit-user-drag: none;
     }
-    
-    /* ... (rest of the styles for pin, form, and Discord link are unchanged) ... */
 
-    /* Style for the pins that will be placed on the map */
     .pin {
       position: absolute;
       width: 24px;
       height: 24px;
       background: red;
       border-radius: 50%;
-      border: 2px solid white;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-      transform: translate(-50%, -100%); /* Centers the pin on its point */
+      transform: translate(-50%, -100%);
       cursor: pointer;
     }
 
-    /* The form for adding a new pin */
     #pin-form {
       position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       background: white;
-      border: 1px solid #ccc;
-      padding: 24px;
-      border-radius: 8px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      border: 1px solid #444;
+      padding: 16px;
       z-index: 1000;
-      display: none; /* Hidden by default */
-      width: 350px;
-    }
-    #pin-form h3 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      color: #333;
-    }
-    #pin-form label {
-      display: block;
-      margin-bottom: 8px;
-      color: #555;
-    }
-    #pin-form input, #pin-form textarea {
-      width: 100%;
-      padding: 8px;
-      box-sizing: border-box;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      margin-top: 4px;
-    }
-    #pin-form .form-actions {
-      margin-top: 20px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-    #pin-form button {
-      padding: 10px 15px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    #pin-submit {
-      background-color: #28a745;
-      color: white;
-    }
-    #pin-cancel {
-      background-color: #f0f0f0;
-      color: #333;
+      display: none;
     }
 
-    /* Link to Discord */
     #discord-link {
       position: fixed;
-      top: 15px;
-      right: 15px;
+      top: 10px;
+      right: 10px;
       background: #5865F2;
       color: white;
-      padding: 10px 15px;
-      border-radius: 8px;
+      padding: 10px 14px;
+      border-radius: 6px;
       text-decoration: none;
       font-weight: bold;
-      z-index: 999;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-      transition: background 0.3s;
+      z-index: 9999;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
     }
-    #discord-link:hover {
-      background: #404EED;
+
+    .popup-gallery {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      padding: 16px;
+      border: 1px solid #ccc;
+      z-index: 9999;
+      max-height: 80vh;
+      overflow-y: auto;
+      width: 400px;
+    }
+
+    .popup-gallery img,
+    .popup-gallery video {
+      max-width: 100%;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .popup-gallery button {
+      margin-top: 10px;
+      padding: 6px 10px;
     }
   </style>
 </head>
 <body>
 
   <div id="viewer">
-      <img id="mapImage" src="https://placehold.co/2000x1500/e0e0e0/333?text=Your+Map+Image" alt="Game Map">
+    <img id="mapImage" src="img/map.jpg" alt="Game Map">
   </div>
 
   <div id="pin-form">
     <h3>Add a New Spot</h3>
-    <label>Title: <input type="text" id="pin-title" /></label>
-    <label>Description:<textarea id="pin-description" rows="3"></textarea></label>
-    <label>Media: <input type="file" id="pin-media" accept="image/*,video/*" multiple /></label>
-    <div class="form-actions">
-      <button id="pin-cancel">Cancel</button>
-      <button id="pin-submit">Submit</button>
-    </div>
+    <label>Title: <input type="text" id="pin-title" /></label><br><br>
+    <label>Description:<br><textarea id="pin-description"></textarea></label><br><br>
+    <label>Media (up to 2 images, 1 video): <input type="file" id="pin-media" accept="image/*,video/*" multiple /></label><br><br>
+    <button id="pin-submit">📍 Submit</button>
+    <button id="pin-cancel">❌ Cancel</button>
   </div>
 
-  <a href="https://discord.gg/" target="_blank" id="discord-link">
+  <a href="https://discord.gg/YOUR_INVITE_CODE" target="_blank" id="discord-link">
     💬 Join our Discord
   </a>
-  <script src="https://unpkg.com/@panzoom/panzoom@4.6.0/dist/panzoom.min.js"></script>
-  <!-- Panzoom library and map initialization script -->
-  <script type="module">
-    
 
-    const viewer = document.getElementById('viewer');
-    const image = document.getElementById('mapImage');
-    
-    const panzoom = Panzoom(image, {
-      maxScale: 5,
-      minScale: 0.3,
-      // KEY CHANGE: This disables the library's click-and-drag panning feature.
-      disablePan: true, 
-      canvas: true
-    });
-
-    // We still use panzoom for its excellent mouse-wheel zooming.
-    viewer.addEventListener('wheel', panzoom.zoomWithWheel);
-
-    // This logic for centering the image on load is still good.
-    image.onload = () => {
-      const viewerWidth = viewer.offsetWidth;
-      const viewerHeight = viewer.offsetHeight;
-      const imageWidth = image.naturalWidth;
-      const imageHeight = image.naturalHeight;
-
-      const scale = Math.min(viewerWidth / imageWidth, viewerHeight / imageHeight);
-      
-      // We don't need the 0.8 multiplier anymore since scrollbars will handle overflow.
-      panzoom.zoom(scale, { animate: false });
-
-      // We don't need to manually pan it to the center since the viewer's
-      // scrollbars will start in the top-left, which is what we want.
-    };
-    
-    if (image.complete) {
-      image.onload();
-    }
-
-    // KEY CHANGE: Replaced 'panzoomend' with a more robust click vs. drag detection.
-    let isDragging = false;
-    let startX, startY;
-
-    image.addEventListener('pointerdown', (e) => {
-      isDragging = false;
-      startX = e.clientX;
-      startY = e.clientY;
-    });
-
-    image.addEventListener('pointermove', (e) => {
-      // If the mouse moves more than a few pixels, we can assume the user is dragging.
-      if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) {
-        isDragging = true;
-      }
-    });
-
-    image.addEventListener('pointerup', (e) => {
-      // Only fire the event if the user was NOT dragging.
-      if (!isDragging) {
-        const mapClickEvent = new CustomEvent('mapclick', {
-          detail: {
-            panzoom: panzoom,
-            originalEvent: e
-          }
-        });
-        image.dispatchEvent(mapClickEvent);
-      }
-      // Reset for the next interaction.
-      isDragging = false;
-    });
-  </script>
-
-  <!-- We use `defer` to ensure this script runs AFTER the module script above has parsed. -->
-  <script src="js/app.js" defer></script>
+  <script src="/js/app.js"></script>
 </body>
 </html>
