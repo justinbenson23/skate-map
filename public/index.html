@@ -157,13 +157,16 @@
     const image = document.getElementById('mapImage');
     
     const panzoom = Panzoom(image, {
-      maxScale: 5,
-      minScale: 0.3,
-      contain: 'outside',
-      canvas: true
-    });
+      maxScale: 5
+})
+    panzoom.pan(10, 10)
+    panzoom.zoom(2, { animate: true })
 
-    viewer.addEventListener('wheel', panzoom.zoomWithWheel);
+    // Panning and pinch zooming are bound automatically (unless disablePan is true).
+    // There are several available methods for zooming
+    // that can be bound on button clicks or mousewheel.
+    
+    elem.parentElement.addEventListener('wheel', panzoom.zoomWithWheel);
 
     image.onload = () => {
       const viewerWidth = viewer.offsetWidth;
