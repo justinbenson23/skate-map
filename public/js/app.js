@@ -29,19 +29,20 @@ pinCancel.addEventListener('click', () => {
   pinForm.style.display = 'none';
 });
 
-// Validate media
+// Validate video upload
 pinMediaInput.addEventListener('change', () => {
-  const files = Array.from(pinMediaInput.files);
-  let imageCount = 0;
-  let videoCount = 0;
+  const file = pinMediaInput.files[0];
 
-  for (const file of files) {
-    if (file.type.startsWith('image/')) imageCount++;
-    if (file.type.startsWith('video/')) videoCount++;
+  if (!file) return;
+
+  if (!file.type.startsWith('video/') || file.type !== 'video/mp4') {
+    alert('Only MP4 video files are allowed.');
+    pinMediaInput.value = '';
+    return;
   }
 
-  if (imageCount > 2 || videoCount > 1) {
-    alert('You can upload up to 2 images and 1 video only.');
+  if (file.size > 25 * 1024 * 1024) {
+    alert('Video must be less than 25MB.');
     pinMediaInput.value = '';
   }
 });
@@ -50,10 +51,10 @@ pinMediaInput.addEventListener('change', () => {
 pinSubmit.addEventListener('click', async () => {
   const title = pinTitle.value.trim();
   const description = pinDescription.value.trim();
-  const files = pinMediaInput.files;
+  const file = pinMediaInput.files[0];
 
-  if (!title || !description || !clickCoords || files.length === 0) {
-    return alert('All fields and at least one file are required.');
+  if (!title || !description || !clickCoords || !file) {
+    return alert('All fields and a video file are required.');
   }
 
   const formData = new FormData();
@@ -61,10 +62,7 @@ pinSubmit.addEventListener('click', async () => {
   formData.append('description', description);
   formData.append('x_pct', clickCoords.x_pct);
   formData.append('y_pct', clickCoords.y_pct);
-
-  for (const file of files) {
-    formData.append('media', file);
-  }
+  formData.append('media', file);
 
   try {
     await fetch('/api/pins-with-media', {
@@ -98,7 +96,6 @@ async function loadPins() {
     let y = pin.y_pct * 100;
     let attempts = 0;
 
-    // Adjust if overlapping
     while (attempts < 10 && placed.some(p => Math.abs(p.x - x) < buffer && Math.abs(p.y - y) < buffer)) {
       x += (Math.random() - 0.5) * buffer;
       y += (Math.random() - 0.5) * buffer;
@@ -111,9 +108,8 @@ async function loadPins() {
     pinEl.className = 'pin';
     pinEl.style.left = `${x}%`;
     pinEl.style.top = `${y}%`;
-    pinEl.title = pin.title; // Tooltip on hover ✅
+    pinEl.title = pin.title;
 
-    // Click to open media popup
     pinEl.addEventListener('click', () => {
       const popup = document.createElement('div');
       popup.className = 'popup-gallery';
@@ -121,9 +117,7 @@ async function loadPins() {
       let mediaHTML = '';
       if (Array.isArray(pin.media) && pin.media.length > 0) {
         pin.media.forEach(media => {
-          if (media.type === 'image') {
-            mediaHTML += `<img src="${media.url}" alt="image" style="max-width: 100%; margin-top: 10px;">`;
-          } else if (media.type === 'video') {
+          if (media.type === 'video') {
             mediaHTML += `<video src="${media.url}" controls style="max-width: 100%; margin-top: 10px;"></video>`;
           }
         });
