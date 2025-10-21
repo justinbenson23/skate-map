@@ -65,7 +65,12 @@ async function uploadToB2(buffer, filename, contentType) {
     mime: contentType,
   });
 
-  return `https://f000.backblazeb2.com/file/${process.env.B2_BUCKET_ID}/${filename}`;
+  const publicBase = process.env.B2_PUBLIC_BASE_URL
+    || (process.env.B2_BUCKET_NAME ? `https://f000.backblazeb2.com/file/${process.env.B2_BUCKET_NAME}` : null);
+  if (!publicBase) {
+    throw new Error('Missing B2 public URL. Set B2_PUBLIC_BASE_URL or B2_BUCKET_NAME.');
+  }
+  return `${publicBase}/${filename}`;
 }
 
 // ===== API Routes =====
@@ -96,12 +101,20 @@ app.post('/api/pins-with-media', upload.single('video'), async (req, res) => {
       return res.status(400).json({ message: 'Video file is required.' });
     }
 
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(req.file.originalname) || '.mp4';
+    const filename = `${unique}${ext}`;
+
+    const b2Url = await uploadToB2(req.file.buffer, filename, req.file.mimetype || 'video/mp4');
+
     const pin = new Pin({
       title,
       description,
-      x_pct,
-      y_pct,
-      videoUrl: `/uploads/${req.file.filename}`
+      x_pct: parseFloat(x_pct),
+      y_pct: parseFloat(y_pct),
+      media: [
+        { url: b2Url, type: 'video' }
+      ]
     });
 
     await pin.save();
@@ -200,9 +213,12 @@ app.get('/admin/flagged-pins', adminAuth, async (req, res) => {
           <div class="pin">
             <strong>${pin.title}</strong><br>
             ${pin.description}<br>
-            ${pin.mediaType === 'image' 
-              ? `<img src="${pin.mediaUrl}" />` 
-              : `<video src="${pin.mediaUrl}" controls></video>`}
+            ${Array.isArray(pin.media) && pin.media.length
+              ? pin.media.map(m => m.type === 'image'
+                  ? `<img src="${m.url}" />`
+                  : `<video src="${m.url}" controls></video>`
+                ).join('')
+              : '<em>No media</em>'}
             <form method="POST" action="/admin/pin/${pin._id}/unflag?key=${req.query.key}" style="display:inline;">
               <button type="submit">✅ Unflag</button>
             </form>
@@ -228,7 +244,6 @@ app.post('/admin/pin/:id/delete', adminAuth, async (req, res) => {
 });
 
 
-console.log("Env ADMIN_KEY:", process.env.ADMIN_KEY);
 
 // Admin route middleware
 const requireAdmin = (req, res, next) => {

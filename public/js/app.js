@@ -2,7 +2,7 @@ const mapImage = document.getElementById('mapImage');
 const pinForm = document.getElementById('pin-form');
 const pinTitle = document.getElementById('pin-title');
 const pinDescription = document.getElementById('pin-description');
-const pinMediaInput = document.getElementById('pin-media');
+const pinMediaInput = document.getElementById('pinMedia');
 const pinSubmit = document.getElementById('pin-submit');
 const pinCancel = document.getElementById('pin-cancel');
 
@@ -62,7 +62,7 @@ pinSubmit.addEventListener('click', async () => {
   formData.append('description', description);
   formData.append('x_pct', clickCoords.x_pct);
   formData.append('y_pct', clickCoords.y_pct);
-  formData.append('media', file);
+  formData.append('video', file);
 
   try {
     await fetch('/api/pins-with-media', {
