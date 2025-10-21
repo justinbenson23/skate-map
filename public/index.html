@@ -27,13 +27,16 @@
       height: 100vh;
       background: #000;
       overflow: hidden;
+      touch-action: none;
       
     }
 
     #mapImage {
-      height: auto;
       max-width: none;
       display: block;
+      user-select: none;
+      -webkit-user-drag: none;
+      cursor: grab;
     }
 
     .pin {
@@ -136,15 +139,23 @@
   </a>
 
   <script type="module">
-    import Panzoom from 'https://unpkg.com/@panzoom/panzoom@4.0.4/dist/panzoom.es.min.js';
+  import Panzoom from 'https://unpkg.com/@panzoom/panzoom@4.0.4/dist/panzoom.es.min.js';
 
-    const image = document.getElementById('mapImage');
-    const panzoom=Panzoom(image, {
-      maxScale: 5,
-      minScale: 0.5,
-      contain: 'outside',
-    });
-  image.parentElement.addEventListener('wheel', panzoom.zoomWithWheel);  
+  const image = document.getElementById('mapImage');
+
+  // Apply Panzoom to the image
+  const panzoom = Panzoom(image, {
+    maxScale: 5,
+    minScale: 0.5,
+    contain: 'outside',        // allows free dragging
+    cursor: 'grab'             // shows a grab cursor
+  });
+
+  // Enable mouse wheel zooming
+  image.parentElement.addEventListener('wheel', panzoom.zoomWithWheel);
+
+  // Optional: make sure drag works with left-click
+  image.style.pointerEvents = 'auto';
   </script>
 
   <script src="/js/app.js"></script>
