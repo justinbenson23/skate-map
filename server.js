@@ -5,6 +5,7 @@ const path = require('path');
 const B2 = require('backblaze-b2');
 const mongoose = require('mongoose');
 const Pin = require('./models/Pin');
+const fs = require('fs');
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB via Mongoose'))
@@ -18,13 +19,30 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'public/uploads/';
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, unique + path.extname(file.originalname));
+  }
+});
 // ===== Multer setup for media uploads =====
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 25 * 1024 * 1024,
   },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'video/mp4') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .mp4 videos are allowed.'));
+    }
+  }
 });
 
 // ===== Backblaze B2 setup =====
@@ -70,63 +88,27 @@ app.get('/api/pins', async (req, res) => {
 });
 
 // Submit pin with media
-app.post('/api/pins-with-media', upload.array('media', 3), async (req, res) => {
+app.post('/api/pins-with-media', upload.single('video'), async (req, res) => {
   try {
     const { title, description, x_pct, y_pct } = req.body;
-    const files = req.files;
 
-    if (!files || files.length === 0) {
-      return res.status(400).json({ error: 'At least one media file is required' });
+    if (!req.file) {
+      return res.status(400).json({ message: 'Video file is required.' });
     }
 
-    let imageCount = 0;
-    let videoCount = 0;
-
-    const media = [];
-
-    for (const file of files) {
-      const mime = file.mimetype;
-      let mediaType;
-
-      if (mime.startsWith('image/')) {
-        imageCount++;
-        if (imageCount > 2) {
-          return res.status(400).json({ error: 'Maximum of 2 images allowed' });
-        }
-        if (file.size > 1 * 1024 * 1024) {
-          return res.status(400).json({ error: 'Image too large (max 1MB)' });
-        }
-        mediaType = 'image';
-      } else if (mime.startsWith('video/')) {
-        videoCount++;
-        if (videoCount > 1) {
-          return res.status(400).json({ error: 'Only one video allowed' });
-        }
-        mediaType = 'video';
-      } else {
-        return res.status(400).json({ error: 'Unsupported file type' });
-      }
-
-      const ext = path.extname(file.originalname);
-      const filename = `pins/${Date.now()}_${Math.random().toString(36).substring(2)}${ext}`;
-      const url = await uploadToB2(file.buffer, filename, mime);
-
-      media.push({ url, type: mediaType });
-    }
-
-    const newPin = new Pin({
+    const pin = new Pin({
       title,
       description,
-      x_pct: parseFloat(x_pct),
-      y_pct: parseFloat(y_pct),
-      media,
+      x_pct,
+      y_pct,
+      videoUrl: `/uploads/${req.file.filename}`
     });
 
-    const savedPin = await newPin.save();
-    res.json(savedPin);
-  } catch (err) {
-    console.error('Upload failed:', err);
-    res.status(500).json({ error: 'Upload failed' });
+    await pin.save();
+    res.status(200).json({ message: 'Pin saved successfully', pin });
+  } catch (error) {
+    console.error('Error saving pin:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 
