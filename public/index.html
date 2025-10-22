@@ -49,11 +49,15 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: white;
-      border: 1px solid #444;
-      padding: 16px;
+      background: #fff;
+      border: 1px solid #e3e3e3;
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.18);
       z-index: 1000;
       display: none;
+      width: 360px;
+      max-width: calc(100vw - 32px);
     }
 
     #discord-link {
@@ -76,12 +80,15 @@
       left: 50%;
       transform: translate(-50%, -50%);
       background: #fff;
-      padding: 16px;
-      border: 1px solid #ccc;
+      padding: 20px 22px;
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.18);
       z-index: 9999;
       max-height: 80vh;
       overflow-y: auto;
-      width: 400px;
+      width: 440px;
+      max-width: calc(100vw - 32px);
     }
 
     .popup-gallery img,
@@ -93,12 +100,58 @@
 
     .popup-gallery button {
       margin-top: 10px;
-      padding: 6px 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #d0d0d0;
+      background: #f8f8f8;
+      cursor: pointer;
+    }
+
+    /* Make the Submit button pop */
+    #pin-submit {
+      background: #2ecc71;
+      color: white;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 16px rgba(46, 204, 113, 0.35);
+      transition: transform 0.05s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    #pin-submit:hover {
+      background: #28b765;
+      box-shadow: 0 10px 20px rgba(46, 204, 113, 0.45);
+    }
+    #pin-submit:active { transform: translateY(1px); }
+
+    /* Subtle style for Cancel */
+    #pin-cancel {
+      background: #f2f2f2;
+      color: #333;
+      border: 1px solid #dcdcdc;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
     }
     #privacy-link {
       position: fixed;
       left: 10px;
       bottom: 10px;
+      background: rgba(255,255,255,0.95);
+      color: #111;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      z-index: 9999;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      border: 1px solid #ddd;
+    }
+    #about-link {
+      position: fixed;
+      left: 10px;
+      bottom: 52px; /* sits above the Privacy link */
       background: rgba(255,255,255,0.95);
       color: #111;
       padding: 8px 12px;
@@ -132,6 +185,7 @@
   </a>
 
   <a href="/privacy.html" id="privacy-link">Privacy</a>
+  <a href="/about.html" id="about-link">About</a>
   <script src="/js/app.js"></script>
 </body>
 </html>

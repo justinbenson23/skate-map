@@ -166,3 +166,31 @@ async function loadPins() {
 }
 
 loadPins();
+
+// Show welcome popup on first visit
+(function showWelcomeOnFirstVisit() {
+  try {
+    if (localStorage.getItem('welcomeShown') === '1') return;
+  } catch (e) {
+    // If localStorage is unavailable, still show the modal once
+  }
+
+  const modal = document.createElement('div');
+  modal.className = 'popup-gallery';
+  modal.innerHTML = `
+    <h3>Welcome to the Skate Loc Spot Map</h3>
+    <p>
+      Welcome to the Skate Loc Spot Map. Where you can check out other skaters spots and add your own with a video showcasing your style. Just click on the map in the area where you found a sick spot you want to share, and fill in the details. As Coach Frank used to say "Do a kickflip!!!"
+    </p>
+    <button id="welcome-close-btn">Skate On</button>
+  `;
+
+  document.body.appendChild(modal);
+
+  const close = () => {
+    modal.remove();
+    try { localStorage.setItem('welcomeShown', '1'); } catch (e) {}
+  };
+
+  document.getElementById('welcome-close-btn').addEventListener('click', close);
+})();
