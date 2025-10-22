@@ -53,7 +53,7 @@ const b2 = new B2({
 
 // ===== Helper to upload to B2 =====
 async function uploadToB2(buffer, filename, contentType) {
-  await b2.authorize();
+  const { data: auth } = await b2.authorize();
   const { data: uploadUrlData } = await b2.getUploadUrl({ bucketId: process.env.B2_BUCKET_ID });
   const { uploadUrl, authorizationToken } = uploadUrlData;
 
@@ -65,8 +65,12 @@ async function uploadToB2(buffer, filename, contentType) {
     mime: contentType,
   });
 
+  const downloadUrl = auth && auth.downloadUrl ? auth.downloadUrl : 'https://f000.backblazeb2.com';
+  const bucketName = process.env.B2_BUCKET_NAME || (auth && auth.allowed && auth.allowed.bucketName) || null;
+
   const publicBase = process.env.B2_PUBLIC_BASE_URL
-    || (process.env.B2_BUCKET_NAME ? `https://f000.backblazeb2.com/file/${process.env.B2_BUCKET_NAME}` : null);
+    || (bucketName ? `${downloadUrl}/file/${bucketName}` : null);
+
   if (!publicBase) {
     throw new Error('Missing B2 public URL. Set B2_PUBLIC_BASE_URL or B2_BUCKET_NAME.');
   }
