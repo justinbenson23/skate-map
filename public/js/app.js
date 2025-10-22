@@ -21,6 +21,8 @@ window.addEventListener('resize', sizeOverlayToImage);
 
 // Click on overlay to open form
 overlay.addEventListener('click', (e) => {
+  // Only start a new pin if clicking directly on the overlay background
+  if (e.target !== overlay) return;
   const rect = overlay.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
@@ -121,7 +123,9 @@ async function loadPins() {
     pinEl.style.top = `${y}%`;
     pinEl.title = pin.title;
 
-    pinEl.addEventListener('click', () => {
+    pinEl.addEventListener('click', (evt) => {
+      // Prevent bubbling to overlay which would open submission form
+      evt.stopPropagation();
       const popup = document.createElement('div');
       popup.className = 'popup-gallery';
 
@@ -129,10 +133,7 @@ async function loadPins() {
       if (Array.isArray(pin.media) && pin.media.length > 0) {
         pin.media.forEach(media => {
           if (media.type === 'video') {
-            mediaHTML += `
-              <video controls preload="metadata" crossorigin="anonymous" style="max-width: 100%; margin-top: 10px;">
-                <source src="${media.url}" type="video/mp4" />
-              </video>`;
+            mediaHTML += `<p><a href="${media.url}" target="_blank" rel="noopener noreferrer">Open video in new tab</a></p>`;
           }
         });
       } else {
