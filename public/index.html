@@ -27,6 +27,13 @@
       -webkit-user-drag: none;
     }
 
+    #overlay {
+      position: absolute;
+      left: 0;
+      top: 0;
+      z-index: 10;
+    }
+
     .pin {
       position: absolute;
       width: 24px;
@@ -94,6 +101,7 @@
 
   <div id="viewer">
     <img id="mapImage" src="img/map.jpg" alt="Game Map">
+    <div id="overlay"></div>
   </div>
 
   <div id="pin-form">

@@ -1,4 +1,5 @@
 const mapImage = document.getElementById('mapImage');
+const overlay = document.getElementById('overlay');
 const pinForm = document.getElementById('pin-form');
 const pinTitle = document.getElementById('pin-title');
 const pinDescription = document.getElementById('pin-description');
@@ -8,14 +9,24 @@ const pinCancel = document.getElementById('pin-cancel');
 
 let clickCoords = null;
 
-// Click on map to open form
-mapImage.addEventListener('click', (e) => {
-  const rect = mapImage.getBoundingClientRect();
+// Ensure overlay matches image size
+function sizeOverlayToImage() {
+  overlay.style.width = mapImage.clientWidth + 'px';
+  overlay.style.height = mapImage.clientHeight + 'px';
+}
+
+if (mapImage.complete) sizeOverlayToImage();
+mapImage.addEventListener('load', sizeOverlayToImage);
+window.addEventListener('resize', sizeOverlayToImage);
+
+// Click on overlay to open form
+overlay.addEventListener('click', (e) => {
+  const rect = overlay.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  const x_pct = x / mapImage.offsetWidth;
-  const y_pct = y / mapImage.offsetHeight;
+  const x_pct = x / overlay.clientWidth;
+  const y_pct = y / overlay.clientHeight;
 
   clickCoords = { x_pct, y_pct };
 
@@ -118,7 +129,10 @@ async function loadPins() {
       if (Array.isArray(pin.media) && pin.media.length > 0) {
         pin.media.forEach(media => {
           if (media.type === 'video') {
-            mediaHTML += `<video src="${media.url}" controls style="max-width: 100%; margin-top: 10px;"></video>`;
+            mediaHTML += `
+              <video controls preload="metadata" crossorigin="anonymous" style="max-width: 100%; margin-top: 10px;">
+                <source src="${media.url}" type="video/mp4" />
+              </video>`;
           }
         });
       } else {
@@ -146,7 +160,7 @@ async function loadPins() {
       document.getElementById('close-pin-btn').onclick = () => popup.remove();
     });
 
-    document.getElementById('viewer').appendChild(pinEl);
+    overlay.appendChild(pinEl);
   });
 }
 
