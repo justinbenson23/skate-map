@@ -205,7 +205,12 @@ app.get('/admin/flagged-pins', adminAuth, async (req, res) => {
       <head>
         <title>Flagged Pins</title>
         <style>
-          body { font-family: sans-serif; padding: 20px; }
+          body {
+            font-family: sans-serif;
+            padding: 20px;
+            margin: 0;
+            background: linear-gradient(rgba(255,255,255,0.88), rgba(255,255,255,0.88)), url('/img/background.jpg') center/cover no-repeat fixed;
+          }
           .pin { border: 1px solid #ccc; padding: 12px; margin-bottom: 10px; }
           img, video { max-width: 300px; display: block; margin-top: 10px; }
           button { margin-right: 10px; }

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy</title>
+  <style>
+    :root { --bg-url: url('/img/background.jpg'); }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      line-height: 1.6;
+      color: #222;
+      background: linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.85)), var(--bg-url) center/cover no-repeat fixed;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    .panel {
+      width: 100%;
+      max-width: 900px;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    }
+    h1 { margin-top: 0; }
+    h2 { margin-top: 24px; }
+    a { color: #2c6bed; }
+    .muted { color: #666; font-size: 0.9em; }
+  </style>
+  <meta name="robots" content="noindex">
+</head>
+<body>
+  <div class="panel">
+    <h1>Privacy Policy</h1>
+    <p class="muted">Effective: <span id="effective-date">2025-01-01</span></p>
+
+  <p>
+    This page explains what information is collected when you use the site, how it is used,
+    and your choices. By using the site, you agree to this policy.
+  </p>
+
+  <h2>Information We Collect</h2>
+  <ul>
+    <li>Pins you submit: title, description, map coordinates, and any uploaded media (e.g., video).</li>
+    <li>Basic technical data: IP address and user‑agent may be logged for security and abuse prevention.</li>
+  </ul>
+
+  <h2>How We Use Information</h2>
+  <ul>
+    <li>Display pins and media on the map for other users.</li>
+    <li>Moderate content (e.g., handle reports/flags, remove prohibited content).</li>
+    <li>Improve stability and protect against abuse.</li>
+  </ul>
+
+  <h2>Media Hosting</h2>
+  <p>
+    Uploaded videos are stored with Backblaze B2. Public links are used to display or open media.
+    Please avoid uploading sensitive content; submissions are public by design.
+  </p>
+
+  <h2>Cookies</h2>
+  <p>
+    The site may use basic cookies or local storage for functionality (e.g., UI state). No advertising cookies.
+  </p>
+
+  <h2>Data Retention</h2>
+  <p>
+    Pins and media may be retained until deleted by an admin or as required to operate the service.
+  </p>
+
+  <h2>Your Choices</h2>
+  <ul>
+    <li>Do not upload media or information you do not want to be public.</li>
+    <li>Use the report feature to flag content that violates guidelines.</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p>
+    For privacy questions or requests, contact the site admin.
+  </p>
+
+    <p><a href="/">Back to the map</a></p>
+  </div>
+
+  <script>
+    // Update effective date easily if needed
+    // document.getElementById('effective-date').textContent = new Date().toISOString().slice(0,10);
+  </script>
+</body>
+</html>
