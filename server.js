@@ -65,7 +65,7 @@ async function uploadToB2(buffer, filename, contentType) {
     mime: contentType,
   });
 
-  const downloadUrl = auth && auth.downloadUrl ? auth.downloadUrl : 'https://f000.backblazeb2.com';
+  const downloadUrl = auth && auth.downloadUrl ? auth.downloadUrl : 'https://skate-pin-uploads.s3.us-east-005.backblazeb2.com/';
   const bucketName = process.env.B2_BUCKET_NAME || (auth && auth.allowed && auth.allowed.bucketName) || null;
 
   const publicBase = process.env.B2_PUBLIC_BASE_URL
